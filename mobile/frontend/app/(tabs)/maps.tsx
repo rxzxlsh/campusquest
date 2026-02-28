@@ -123,8 +123,12 @@ export default function MapsScreen() {
             <TouchableOpacity 
               style={styles.button} 
               onPress={() => {
+                if (!selectedLocation) return;
                 setSelectedLocation(null);
-                router.push('/(tabs)/challenge');
+                router.push({
+                  pathname: "/(tabs)/challenge",
+                  params: { challengeId: selectedLocation.challengeId },
+                });
               }}
             >
               <Text style={styles.buttonText}>See Challenge</Text>

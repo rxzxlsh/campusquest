@@ -1,13 +1,19 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ override: true });
 
 export const connectDB = async () => {
+  const mongoUri = process.env.MONGO_URI;
+  if (!mongoUri) {
+    console.warn("MONGO_URI is not set. Running with in-memory fallback for reward profiles.");
+    return;
+  }
+
   try {
-    await mongoose.connect(process.env.MONGO_URI as string);
+    await mongoose.connect(mongoUri);
     console.log('MongoDB Connected');
   } catch (err) {
     console.error('MongoDB connection error:', err);
-    process.exit(1);
+    console.warn("Continuing without MongoDB. Reward profile data will be in-memory only.");
   }
 };

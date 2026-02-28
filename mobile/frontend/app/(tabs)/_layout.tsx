@@ -33,10 +33,28 @@ export default function TabLayout() {
       <Tabs.Screen
         name="maps"
         options={{
-        title: 'Map',
-        tabBarIcon: ({ color }) => (
-        <IconSymbol name="map.fill" color={color} size={24} />
-        ),
+          title: 'Map',
+          tabBarIcon: ({ color }) => <IconSymbol name="map.fill" color={color} size={24} />,
+        }}
+      />
+      <Tabs.Screen
+        name="scan"
+        options={{
+          title: 'Scan',
+          tabBarIcon: ({ color }) => <IconSymbol name="qrcode.viewfinder" color={color} size={24} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <IconSymbol name="person.fill" color={color} size={24} />,
+        }}
+      />
+      <Tabs.Screen
+        name="challenge"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
