@@ -68,7 +68,7 @@ export default function ScanScreen() {
       const candidates = Array.from(
         new Set([extractedChallengeId, extractedChallengeId.toUpperCase(), extractedChallengeId.toLowerCase()])
       );
-
+      
       let resolvedChallengeId: string | null = null;
       for (const candidateId of candidates) {
         const response = await fetch(`${API_BASE_URL}/challenges/${candidateId}`);
