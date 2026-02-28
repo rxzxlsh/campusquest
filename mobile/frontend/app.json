@@ -39,7 +39,9 @@
           }
         }
       ],
-      "expo-barcode-scanner"
+      "expo-barcode-scanner",
+      "react-native-auth0",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
