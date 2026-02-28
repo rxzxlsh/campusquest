@@ -34,12 +34,12 @@ type CampusNode = {
 const UTM_NODES: CampusNode[] = [
   {
     id: 1,
-    name: "Robarts Library",
-    latitude: 43.6648,
-    longitude: -79.3994,
+    name: "Maanjiwe Nendamowinan",
+    latitude: 43.55111,
+    longitude: -79.66583,
     emoji: "🌱",
     club: "Green Leading Club UofT",
-    tag: "Sustainability",
+    tag: "Sustainability", 
     description: "Spot and report hidden campus inefficiencies to unlock Green Ops rewards.",
     challenge: "Innovation Micro-Quest: document 3 practical waste-reduction opportunities.",
     xp: 50,
@@ -50,9 +50,9 @@ const UTM_NODES: CampusNode[] = [
   },
   {
     id: 2,
-    name: "Bahen Centre",
-    latitude: 43.6597,
-    longitude: -79.3978,
+    name: "Instructional Centre",
+    latitude: 43.55160,
+    longitude: -79.66400,
     emoji: "💻",
     club: "Computer Science Student Community",
     tag: "Technology",
@@ -66,11 +66,11 @@ const UTM_NODES: CampusNode[] = [
   },
   {
     id: 3,
-    name: "Hart House",
-    latitude: 43.6629,
-    longitude: -79.3957,
-    emoji: "📸",
-    club: "Hart House Camera Club",
+    name: "CCIT Building",
+    latitude: 43.5484,
+    longitude: -79.6632,
+    emoji: "🎬",
+    club: "CCIT Camera Club",
     tag: "Creativity",
     description: "Story-driven visual missions built around observation and composition.",
     challenge: "Innovation Micro-Quest: capture one image that explains 'campus momentum'.",
@@ -82,9 +82,9 @@ const UTM_NODES: CampusNode[] = [
   },
   {
     id: 4,
-    name: "Athletic Centre",
-    latitude: 43.6624,
-    longitude: -79.3995,
+    name: "RAWC",
+    latitude: 43.54790,
+    longitude: -79.6609,
     emoji: "🏃",
     club: "Fitness for Noobs",
     tag: "Wellness",
@@ -120,10 +120,10 @@ const STATUS_COLORS: Record<NodeStatus, string> = {
 };
 
 const INITIAL_REGION: Region = {
-  latitude: 43.6629,
-  longitude: -79.3957,
-  latitudeDelta: 0.012,
-  longitudeDelta: 0.012,
+  latitude: 43.5483,
+  longitude: -79.6627,
+  latitudeDelta: 0.01,
+  longitudeDelta: 0.01,
 };
 
 export default function MapsScreen() {
