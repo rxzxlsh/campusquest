@@ -1,13 +1,21 @@
-import { Text, View } from "react-native";
+// app/challenge.tsx
+import { View, Text } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 
 export default function ChallengeScreen() {
-  const { qrData } = useLocalSearchParams<{ qrData: string }>();
+  const { challengeId, prompt, xp, club } = useLocalSearchParams<{
+    challengeId: string;
+    prompt: string;
+    xp: string; // params come as strings
+    club: string;
+  }>();
 
   return (
-    <View>
-      <Text>Challenge Loaded!</Text>
-      <Text>QR Data: {qrData}</Text>
+    <View style={{ padding: 20 }}>
+      <Text style={{ fontSize: 18, fontWeight: "bold" }}>Challenge: {challengeId}</Text>
+      <Text style={{ marginTop: 10 }}>Club: {club}</Text>
+      <Text style={{ marginTop: 10 }}>Prompt: {prompt}</Text>
+      <Text style={{ marginTop: 10 }}>XP: {xp}</Text>
     </View>
   );
 }
