@@ -1,5 +1,6 @@
+// app/scan.tsx
 import { useEffect, useState } from "react";
-import { Text, View, StyleSheet, Button } from "react-native";
+import { Text, View, StyleSheet, Button, ActivityIndicator } from "react-native";
 import { CameraView, Camera } from "expo-camera";
 import { useRouter } from "expo-router";
 
@@ -7,6 +8,7 @@ export default function ScanScreen() {
   const router = useRouter();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -15,37 +17,64 @@ export default function ScanScreen() {
     })();
   }, []);
 
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
+    const handleBarCodeScanned = async ({ data }: { data: string }) => {
+    if (scanned) return;
     setScanned(true);
 
-    console.log("QR Data:", data);
+    let qrData;
+    try {
+        qrData = JSON.parse(data); // parse JSON
+    } catch (error) {
+        console.log("Invalid QR code, not JSON:", data);
+        setScanned(false);
+        return;
+    }
 
-    // Navigate using Expo Router
-    router.push({
-      pathname: "/challenge",
-      params: { qrData: data },
-    });
-  };
+    const { challengeId } = qrData;
+    if (!challengeId) {
+        console.log("Invalid QR code, missing challengeId:", data);
+        setScanned(false);
+        return;
+    }
 
-  if (hasPermission === null) {
-    return <Text>Requesting camera permission...</Text>;
-  }
+    setLoading(true);
 
-  if (hasPermission === false) {
-    return <Text>No access to camera</Text>;
-  }
+    try {
+        // Replace localhost with your LAN IP
+        const response = await fetch(`http://100.114.62.61:3000/challenges/${challengeId}`);
+        const challenge = await response.json();
+
+        router.push({
+        pathname: "/challenge",
+        params: { challengeId, prompt: challenge.prompt, xp: challenge.xp, club: challenge.club },
+        });
+    } catch (error) {
+        console.error("Failed to fetch challenge:", error);
+        setScanned(false);
+    } finally {
+        setLoading(false);
+    }
+    };
+
+  if (hasPermission === null) return <Text>Requesting camera permission...</Text>;
+  if (hasPermission === false) return <Text>No access to camera</Text>;
 
   return (
     <View style={styles.container}>
       <CameraView
         style={StyleSheet.absoluteFillObject}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-        barcodeScannerSettings={{
-          barcodeTypes: ["qr"],
-        }}
+        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
       />
 
-      {scanned && (
+      {loading && (
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color="white" />
+          <Text style={{ color: "white" }}>Fetching challenge...</Text>
+        </View>
+      )}
+
+      {scanned && !loading && (
         <View style={styles.buttonContainer}>
           <Button title="Scan Again" onPress={() => setScanned(false)} />
         </View>
@@ -55,12 +84,7 @@ export default function ScanScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  buttonContainer: {
-    position: "absolute",
-    bottom: 40,
-    alignSelf: "center",
-  },
+  container: { flex: 1 },
+  buttonContainer: { position: "absolute", bottom: 40, alignSelf: "center" },
+  loading: { position: "absolute", top: "50%", alignSelf: "center", alignItems: "center" },
 });
