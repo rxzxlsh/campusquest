@@ -45,8 +45,8 @@ export default function ScanScreen() {
         const challenge = await response.json();
 
         router.push({
-        pathname: "/challenge",
-        params: { challengeId, prompt: challenge.prompt, xp: challenge.xp, club: challenge.club },
+        pathname: "/(tabs)/challenge",
+        params: { challengeId },
         });
     } catch (error) {
         console.error("Failed to fetch challenge:", error);

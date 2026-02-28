@@ -6,11 +6,8 @@ import userRoutes from "./routes/users";
 dotenv.config();
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
-
-connectDB();
 
 type Challenge = {
   id: string;
@@ -19,36 +16,35 @@ type Challenge = {
   description: string;
   xp: number;
   campusCoins: number;
+  solution: string; // Add the correct answer
 };
 
-// ✅ TypeScript-safe challenge store
 const challenges: { [key: string]: Challenge } = {
   CODING_001: {
     id: "CODING_001",
     club: "Coding Club",
     type: "puzzle",
-    description: "Decrypt this cipher hidden in the QR",
+    description: "Decrypt this simple cipher: A=B, B=C, C=D...",
     xp: 50,
     campusCoins: 100,
+    solution: "BCD", // For testing
   },
   PHOTO_001: {
     id: "PHOTO_001",
     club: "Photography Club",
-    type: "photo",
-    description: "Capture symmetry on campus",
+    type: "puzzle",
+    description: "Type the word 'Symmetry' as a test puzzle",
     xp: 30,
     campusCoins: 50,
-  },
-  FIT_001: {
-    id: "FIT_001",
-    club: "Fitness Club",
-    type: "fitness",
-    description: "Design a faster walking path between X and Y",
-    xp: 40,
-    campusCoins: 70,
+    solution: "Symmetry",
   },
 };
-// GET challenge by ID
+
+// Hard-coded wallet
+const testWallet = "0xTESTWALLET";
+
+const userProgress: { [wallet: string]: { [challengeId: string]: "started" | "completed" } } = {};
+
 app.get("/challenges/:id", (req, res) => {
   const { id } = req.params;
   const challenge = challenges[id];
@@ -56,15 +52,36 @@ app.get("/challenges/:id", (req, res) => {
   res.json(challenge);
 });
 
-// POST simulate challenge completion
-app.post("/challenges/:id/complete", (req, res) => {
+app.post("/challenges/:id/start", (req, res) => {
   const { id } = req.params;
-  const { walletAddress } = req.body;
-  const challenge = challenges[id];    
-  if (!challenge) return res.status(404).json({ error: "Challenge not found" });
+  if (!challenges[id]) return res.status(404).json({ error: "Challenge not found" });
 
-  // Normally: increment XP, mint NFT, etc.
-  res.json({ success: true, id, walletAddress });
+  if (!userProgress[testWallet]) userProgress[testWallet] = {};
+  userProgress[testWallet][id] = "started";
+
+  console.log(`${testWallet} started ${id}`);
+  res.json({ message: "Challenge started" });
+});
+
+app.post("/challenges/:id/submit", (req, res) => {
+  const { id } = req.params;
+  const { answer } = req.body;
+
+  if (!challenges[id]) return res.status(404).json({ error: "Challenge not found" });
+
+  if (!userProgress[testWallet]?.[id] || userProgress[testWallet][id] !== "started") {
+    return res.status(400).json({ error: "Challenge not started yet" });
+  }
+
+  const challenge = challenges[id];
+
+  if (answer.trim().toLowerCase() === challenge.solution.trim().toLowerCase()) {
+    userProgress[testWallet][id] = "completed";
+    console.log(`${testWallet} completed ${id}, earned ${challenge.xp} XP & ${challenge.campusCoins} CampusCoins`);
+    res.json({ message: "Correct!", xp: challenge.xp, campusCoins: challenge.campusCoins });
+  } else {
+    res.json({ message: "Incorrect, try again." });
+  }
 });
 
 app.use('/api/users', userRoutes);
