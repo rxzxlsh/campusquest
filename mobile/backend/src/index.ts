@@ -7,19 +7,48 @@ const port = 3000;
 app.use(cors());
 app.use(express.json());
 
-// ✅ TypeScript-safe challenge store
-const challenges: { [key: string]: { prompt: string; xp: number; club: string } } = {
-  CODING_001: { prompt: "Decrypt this cipher", xp: 50, club: "Coding Club" },
-  PHOTO_001: { prompt: "Capture symmetry", xp: 30, club: "Photography Club" },
+// src/index.ts
+type Challenge = {
+  id: string;
+  club: string;
+  type: string;
+  description: string;
+  xp: number;
+  campusCoins: number;
 };
 
+// ✅ TypeScript-safe challenge store
+const challenges: { [key: string]: Challenge } = {
+  CODING_001: {
+    id: "CODING_001",
+    club: "Coding Club",
+    type: "puzzle",
+    description: "Decrypt this cipher hidden in the QR",
+    xp: 50,
+    campusCoins: 100,
+  },
+  PHOTO_001: {
+    id: "PHOTO_001",
+    club: "Photography Club",
+    type: "photo",
+    description: "Capture symmetry on campus",
+    xp: 30,
+    campusCoins: 50,
+  },
+  FIT_001: {
+    id: "FIT_001",
+    club: "Fitness Club",
+    type: "fitness",
+    description: "Design a faster walking path between X and Y",
+    xp: 40,
+    campusCoins: 70,
+  },
+};
 // GET challenge by ID
 app.get("/challenges/:id", (req, res) => {
-  const { id } = req.params;              // <--- Extract the id first
-  const challenge = challenges[id];       // <--- Here is the TS-safe access
-
+  const { id } = req.params;
+  const challenge = challenges[id];
   if (!challenge) return res.status(404).json({ error: "Challenge not found" });
-
   res.json(challenge);
 });
 
