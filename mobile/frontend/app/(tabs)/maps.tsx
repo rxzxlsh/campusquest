@@ -1,141 +1,305 @@
-import { StyleSheet, View, Text, TouchableOpacity, Modal } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
-import { useState } from 'react';
-import { router } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Animated,
+  Modal,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import MapView, { Marker, Polyline, type Region } from "react-native-maps";
+import { router } from "expo-router";
 
-const UOFT_LOCATIONS = [
-  { 
-    id: 1, 
-    name: 'Robarts Library', 
-    latitude: 43.6648, 
-    longitude: -79.3994, 
-    emoji: '🌱',
-    club: 'Green Leading Club UofT',
-    tag: 'Sustainability',
-    description: 'Leads innovation through green campaigns and sustainability initiatives on campus.',
-    challenge: 'Carpool Challenge - Find a carpool buddy on campus and reduce your carbon footprint!',
+type NodeStatus = "online" | "locked";
+
+type CampusNode = {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  emoji: string;
+  club: string;
+  tag: string;
+  description: string;
+  challenge: string;
+  xp: number;
+  coins: number;
+  challengeId: string;
+  status: NodeStatus;
+  chainTo?: string;
+};
+
+const UTM_NODES: CampusNode[] = [
+  {
+    id: 1,
+    name: "Robarts Library",
+    latitude: 43.6648,
+    longitude: -79.3994,
+    emoji: "🌱",
+    club: "Green Leading Club UofT",
+    tag: "Sustainability",
+    description: "Spot and report hidden campus inefficiencies to unlock Green Ops rewards.",
+    challenge: "Innovation Micro-Quest: document 3 practical waste-reduction opportunities.",
     xp: 50,
     coins: 100,
-    challengeId: 'GREEN_001'
+    challengeId: "GREEN_001",
+    status: "online",
+    chainTo: "CODING_001",
   },
-  { 
-    id: 2, 
-    name: 'Bahen Centre', 
-    latitude: 43.6597, 
-    longitude: -79.3978, 
-    emoji: '💻',
-    club: 'Computer Science Student Community',
-    tag: 'Technology',
-    description: 'Coding club that hosts coding puzzles, hackathons and CS events.',
-    challenge: 'Complete 3 small coding problems and attend a CS event to earn the Ready to Build badge!',
+  {
+    id: 2,
+    name: "Bahen Centre",
+    latitude: 43.6597,
+    longitude: -79.3978,
+    emoji: "💻",
+    club: "Computer Science Student Community",
+    tag: "Technology",
+    description: "Cipher and optimization missions that test fast, creative technical thinking.",
+    challenge: "Innovation Micro-Quest: decrypt the node cipher and optimize the broken snippet.",
     xp: 75,
     coins: 150,
-    challengeId: 'CODING_001'
+    challengeId: "CODING_001",
+    status: "online",
+    chainTo: "PHOTO_001",
   },
-  { 
-    id: 3, 
-    name: 'Hart House', 
-    latitude: 43.6629, 
-    longitude: -79.3957, 
-    emoji: '📸',
-    club: 'Hart House Camera Club',
-    tag: 'Creativity',
-    description: 'An image board for sharing creative photography and visual art on campus.',
-    challenge: 'Take a photo that captures the spirit of UofT and share it on the image board!',
+  {
+    id: 3,
+    name: "Hart House",
+    latitude: 43.6629,
+    longitude: -79.3957,
+    emoji: "📸",
+    club: "Hart House Camera Club",
+    tag: "Creativity",
+    description: "Story-driven visual missions built around observation and composition.",
+    challenge: "Innovation Micro-Quest: capture one image that explains 'campus momentum'.",
     xp: 40,
     coins: 80,
-    challengeId: 'PHOTO_001'
+    challengeId: "PHOTO_001",
+    status: "online",
+    chainTo: "FIT_001",
   },
-  { 
-    id: 4, 
-    name: 'Athletic Centre', 
-    latitude: 43.6624, 
-    longitude: -79.3995, 
-    emoji: '🏋️',
-    club: 'Fitness for Noobs',
-    tag: 'Wellness',
-    description: 'Hosts beginner-friendly workouts and wellness events to boost community health.',
-    challenge: 'Complete a 10 minute beginner workout and log your wellness activity!',
+  {
+    id: 4,
+    name: "Athletic Centre",
+    latitude: 43.6624,
+    longitude: -79.3995,
+    emoji: "🏃",
+    club: "Fitness for Noobs",
+    tag: "Wellness",
+    description: "Build route intelligence and collaborative performance strategies.",
+    challenge: "Innovation Micro-Quest: design a faster campus route and explain your logic.",
     xp: 60,
     coins: 120,
-    challengeId: 'FIT_001'
+    challengeId: "FIT_001",
+    status: "online",
   },
 ];
 
-const TAG_COLORS: { [key: string]: string } = {
-  'Sustainability': '#2d6a4f',
-  'Technology': '#1d3557',
-  'Creativity': '#9b2335',
-  'Wellness': '#e07b39',
+const MAP_STYLE = [
+  { elementType: "geometry", stylers: [{ color: "#061024" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#7bb4ff" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#061024" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#1a3f76" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#2b5a97" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0b1d3f" }] },
+  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#14335f" }] },
+];
+
+const TAG_COLORS: Record<string, string> = {
+  Sustainability: "#4ecb99",
+  Technology: "#74b0ff",
+  Creativity: "#ff95c3",
+  Wellness: "#ffd274",
+};
+
+const STATUS_COLORS: Record<NodeStatus, string> = {
+  online: "#7fd0ff",
+  locked: "#8fa7cc",
+};
+
+const INITIAL_REGION: Region = {
+  latitude: 43.6629,
+  longitude: -79.3957,
+  latitudeDelta: 0.012,
+  longitudeDelta: 0.012,
 };
 
 export default function MapsScreen() {
-  const [selectedLocation, setSelectedLocation] = useState<typeof UOFT_LOCATIONS[0] | null>(null);
+  const mapRef = useRef<MapView>(null);
+  const pulse = useRef(new Animated.Value(0)).current;
+  const [selectedNode, setSelectedNode] = useState<CampusNode | null>(UTM_NODES[0]);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1200, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1200, useNativeDriver: true }),
+      ])
+    ).start();
+  }, [pulse]);
+
+  const pulseScale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.5],
+  });
+
+  const trailCoordinates = useMemo(
+    () =>
+      UTM_NODES.map((node) => ({
+        latitude: node.latitude,
+        longitude: node.longitude,
+      })),
+    []
+  );
+
+  const onlineCount = UTM_NODES.filter((node) => node.status === "online").length;
+
+  const focusNode = (node: CampusNode, openPanel = true) => {
+    setSelectedNode(node);
+    if (openPanel) {
+      setDetailOpen(true);
+    }
+    mapRef.current?.animateToRegion(
+      {
+        latitude: node.latitude,
+        longitude: node.longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      },
+      500
+    );
+  };
 
   return (
-    <View style={styles.container}>
-      <MapView
-        style={styles.map}
-        initialRegion={{
-          latitude: 43.6629,
-          longitude: -79.3957,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        }}
-      >
-        {UOFT_LOCATIONS.map((location) => (
-          <Marker
-            key={location.id}
-            coordinate={{ latitude: location.latitude, longitude: location.longitude }}
-            onPress={() => setSelectedLocation(location)}
-          >
-            <View style={styles.markerContainer}>
-              <Text style={styles.emoji}>{location.emoji}</Text>
-            </View>
-          </Marker>
-        ))}
+    <View style={styles.screen}>
+      <MapView ref={mapRef} style={styles.map} initialRegion={INITIAL_REGION} customMapStyle={MAP_STYLE}>
+        <Polyline
+          coordinates={trailCoordinates}
+          strokeColor="#57b7ff"
+          strokeWidth={3}
+          lineDashPattern={[8, 6]}
+        />
+
+        {UTM_NODES.map((node) => {
+          const isSelected = selectedNode?.id === node.id;
+          return (
+            <Marker key={node.id} coordinate={{ latitude: node.latitude, longitude: node.longitude }}>
+              <Pressable onPress={() => focusNode(node, true)} style={styles.markerWrapper}>
+                {isSelected ? (
+                  <Animated.View style={[styles.markerPulse, { transform: [{ scale: pulseScale }] }]} />
+                ) : null}
+                <View style={[styles.markerCore, isSelected ? styles.markerCoreActive : null]}>
+                  <Text style={styles.markerEmoji}>{node.emoji}</Text>
+                </View>
+              </Pressable>
+            </Marker>
+          );
+        })}
       </MapView>
 
+      <SafeAreaView style={styles.hudWrap} pointerEvents="box-none">
+        <View style={styles.hudTop}>
+          <View>
+            <Text style={styles.hudTitle}>Campus Quest Protocol</Text>
+            <Text style={styles.hudSubtitle}>Season 1 | Innovation Trail</Text>
+          </View>
+          <View style={styles.hudBadge}>
+            <Text style={styles.hudBadgeText}>{onlineCount} Nodes Online</Text>
+          </View>
+        </View>
+
+        <View style={styles.hudBottom}>
+          <Text style={styles.railTitle}>Mission Nodes</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+            {UTM_NODES.map((node) => {
+              const active = node.id === selectedNode?.id;
+              return (
+                <Pressable
+                  key={node.id}
+                  style={[styles.nodeChip, active ? styles.nodeChipActive : null]}
+                  onPress={() => focusNode(node, true)}
+                >
+                  <Text style={styles.nodeChipEmoji}>{node.emoji}</Text>
+                  <View style={styles.nodeChipTextWrap}>
+                    <Text style={styles.nodeChipName}>{node.name}</Text>
+                    <Text style={styles.nodeChipMeta}>
+                      {node.tag} | +{node.xp} XP
+                    </Text>
+                  </View>
+                  <View style={[styles.nodeStatus, { backgroundColor: STATUS_COLORS[node.status] }]} />
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </SafeAreaView>
+
       <Modal
-        visible={!!selectedLocation}
+        visible={Boolean(selectedNode) && detailOpen}
         transparent
         animationType="slide"
-        onRequestClose={() => setSelectedLocation(null)}
+        onRequestClose={() => setDetailOpen(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.row}>
-              <View style={[styles.tag, { backgroundColor: TAG_COLORS[selectedLocation?.tag ?? ''] }]}>
-                <Text style={styles.tagText}>{selectedLocation?.tag}</Text>
-              </View>
-            </View>
-            <Text style={styles.modalTitle}>{selectedLocation?.name}</Text>
-            <Text style={styles.clubName}>{selectedLocation?.club}</Text>
-            <Text style={styles.modalDescription}>{selectedLocation?.description}</Text>
-            <View style={styles.challengeBox}>
-              <Text style={styles.challengeTitle}>Active Challenge</Text>
-              <Text style={styles.challengeText}>{selectedLocation?.challenge}</Text>
-              <View style={styles.rewardsRow}>
-                <Text style={styles.reward}>⚡ {selectedLocation?.xp} XP</Text>
-                <Text style={styles.reward}>🪙 {selectedLocation?.coins} Coins</Text>
-              </View>
-            </View>
-            <TouchableOpacity 
-              style={styles.button} 
-              onPress={() => {
-                if (!selectedLocation) return;
-                setSelectedLocation(null);
-                router.push({
-                  pathname: "/(tabs)/challenge",
-                  params: { challengeId: selectedLocation.challengeId },
-                });
-              }}
-            >
-              <Text style={styles.buttonText}>See Challenge</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.closeButton} onPress={() => setSelectedLocation(null)}>
-              <Text style={styles.closeText}>Close</Text>
-            </TouchableOpacity>
+          <View style={styles.modalCard}>
+            {selectedNode ? (
+              <>
+                <View style={styles.modalRow}>
+                  <Text style={styles.modalEmoji}>{selectedNode.emoji}</Text>
+                  <View style={styles.modalTitleWrap}>
+                    <Text style={styles.modalTitle}>{selectedNode.name}</Text>
+                    <Text style={styles.modalClub}>{selectedNode.club}</Text>
+                  </View>
+                  <View style={[styles.modalTag, { backgroundColor: TAG_COLORS[selectedNode.tag] ?? "#8cc0ff" }]}>
+                    <Text style={styles.modalTagText}>{selectedNode.tag}</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.modalDescription}>{selectedNode.description}</Text>
+                <View style={styles.questBox}>
+                  <Text style={styles.questTitle}>Active Innovation Quest</Text>
+                  <Text style={styles.questText}>{selectedNode.challenge}</Text>
+                  <Text style={styles.questChain}>
+                    Chain Link: {selectedNode.chainTo ? `Unlocks ${selectedNode.chainTo}` : "Terminal Node"}
+                  </Text>
+                </View>
+
+                <View style={styles.rewardRow}>
+                  <Text style={styles.rewardPill}>+{selectedNode.xp} XP</Text>
+                  <Text style={styles.rewardPill}>+{selectedNode.coins} Coins</Text>
+                  <Text style={styles.rewardPill}>{selectedNode.challengeId}</Text>
+                </View>
+
+                <View style={styles.modalActions}>
+                  <Pressable
+                    style={[styles.actionButton, styles.actionPrimary]}
+                    onPress={() => {
+                      const challengeId = selectedNode.challengeId;
+                      setDetailOpen(false);
+                      router.push({ pathname: "/(tabs)/challenge", params: { challengeId } });
+                    }}
+                  >
+                    <Text style={styles.actionPrimaryText}>Launch Quest</Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.actionButton, styles.actionGhost]}
+                    onPress={() => {
+                      setDetailOpen(false);
+                      router.push("/(tabs)/scan");
+                    }}
+                  >
+                    <Text style={styles.actionGhostText}>Scan QR Instead</Text>
+                  </Pressable>
+                </View>
+                <Pressable style={styles.dismissButton} onPress={() => setDetailOpen(false)}>
+                  <Text style={styles.dismissButtonText}>Close Panel</Text>
+                </Pressable>
+              </>
+            ) : null}
           </View>
         </View>
       </Modal>
@@ -144,25 +308,260 @@ export default function MapsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  map: { flex: 1 },
-  markerContainer: { borderRadius: 20, padding: 6, backgroundColor: '#fff', borderWidth: 2, borderColor: '#e0e0e0' },
-  emoji: { fontSize: 22 },
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24 },
-  row: { flexDirection: 'row', marginBottom: 8 },
-  tag: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
-  tagText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 2 },
-  clubName: { fontSize: 13, color: '#002A5C', fontWeight: '600', marginBottom: 8 },
-  modalDescription: { fontSize: 14, color: '#555', marginBottom: 16 },
-  challengeBox: { backgroundColor: '#f0f4ff', borderRadius: 10, padding: 16, marginBottom: 16 },
-  challengeTitle: { fontSize: 15, fontWeight: 'bold', marginBottom: 6 },
-  challengeText: { fontSize: 14, color: '#333', marginBottom: 12 },
-  rewardsRow: { flexDirection: 'row', gap: 16 },
-  reward: { fontSize: 14, fontWeight: '600', color: '#002A5C' },
-  button: { backgroundColor: '#002A5C', padding: 15, borderRadius: 10, alignItems: 'center', marginBottom: 10 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  closeButton: { padding: 10, alignItems: 'center' },
-  closeText: { color: 'gray', fontSize: 14 },
+  screen: {
+    flex: 1,
+    backgroundColor: "#020a1a",
+  },
+  map: {
+    flex: 1,
+  },
+  markerWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  markerPulse: {
+    position: "absolute",
+    width: 54,
+    height: 54,
+    borderRadius: 999,
+    backgroundColor: "rgba(97, 184, 255, 0.35)",
+  },
+  markerCore: {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: "#8acbff",
+    backgroundColor: "#0e274f",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  markerCoreActive: {
+    borderColor: "#d4ecff",
+    backgroundColor: "#1b4f91",
+  },
+  markerEmoji: {
+    fontSize: 20,
+  },
+  hudWrap: {
+    position: "absolute",
+    inset: 0,
+    justifyContent: "space-between",
+  },
+  hudTop: {
+    marginTop: 10,
+    marginHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: "rgba(4, 20, 48, 0.86)",
+    borderWidth: 1,
+    borderColor: "#2b5fa9",
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  hudTitle: {
+    color: "#eef7ff",
+    fontSize: 17,
+    fontWeight: "900",
+  },
+  hudSubtitle: {
+    color: "#8bc4ff",
+    marginTop: 1,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  hudBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#4f95f1",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#0f3b77",
+  },
+  hudBadgeText: {
+    color: "#dff1ff",
+    fontWeight: "800",
+    fontSize: 11,
+  },
+  hudBottom: {
+    marginBottom: 18,
+  },
+  railTitle: {
+    color: "#e7f4ff",
+    fontWeight: "800",
+    marginBottom: 8,
+    marginLeft: 16,
+    fontSize: 14,
+  },
+  rail: {
+    paddingHorizontal: 14,
+    gap: 10,
+  },
+  nodeChip: {
+    width: 222,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#2e5d9d",
+    backgroundColor: "rgba(7, 28, 66, 0.9)",
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  nodeChipActive: {
+    borderColor: "#9bd7ff",
+    backgroundColor: "rgba(12, 44, 93, 0.95)",
+  },
+  nodeChipEmoji: {
+    fontSize: 22,
+  },
+  nodeChipTextWrap: {
+    flex: 1,
+  },
+  nodeChipName: {
+    color: "#f3f9ff",
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  nodeChipMeta: {
+    color: "#9fcfff",
+    fontSize: 11,
+    marginTop: 3,
+  },
+  nodeStatus: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 6, 22, 0.65)",
+  },
+  modalCard: {
+    backgroundColor: "#081f49",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderWidth: 1,
+    borderColor: "#3269b3",
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  modalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  modalEmoji: {
+    fontSize: 30,
+  },
+  modalTitleWrap: {
+    flex: 1,
+  },
+  modalTitle: {
+    color: "#f2f9ff",
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  modalClub: {
+    color: "#a6ceff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  modalTag: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  modalTagText: {
+    color: "#052343",
+    fontWeight: "900",
+    fontSize: 11,
+  },
+  modalDescription: {
+    color: "#d5e9ff",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  questBox: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#2f67b5",
+    backgroundColor: "#0d2d61",
+    padding: 12,
+    gap: 8,
+  },
+  questTitle: {
+    color: "#eff7ff",
+    fontWeight: "900",
+    fontSize: 13,
+  },
+  questText: {
+    color: "#d2e8ff",
+    lineHeight: 19,
+    fontSize: 13,
+  },
+  questChain: {
+    color: "#92c5ff",
+    fontWeight: "700",
+    fontSize: 11,
+  },
+  rewardRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  rewardPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#5a9de8",
+    backgroundColor: "#103a73",
+    color: "#e8f4ff",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 12,
+    fontWeight: "700",
+    overflow: "hidden",
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+  },
+  actionButton: {
+    flex: 1,
+    borderRadius: 10,
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  actionPrimary: {
+    backgroundColor: "#2f80ed",
+  },
+  actionGhost: {
+    borderWidth: 1,
+    borderColor: "#6eaef1",
+    backgroundColor: "transparent",
+  },
+  actionPrimaryText: {
+    color: "#f4faff",
+    fontWeight: "900",
+    fontSize: 14,
+  },
+  actionGhostText: {
+    color: "#d9edff",
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  dismissButton: {
+    alignItems: "center",
+    marginTop: 6,
+    paddingVertical: 4,
+  },
+  dismissButtonText: {
+    color: "#9fc7f5",
+    fontWeight: "700",
+  },
 });
