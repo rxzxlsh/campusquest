@@ -53,6 +53,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="leaderboard"
+        options={{
+          title: 'Rankings',
+          tabBarIcon: ({ color }) => <IconSymbol name="trophy.fill" color={color} size={24} />,
+        }}
+      />
+
+      <Tabs.Screen
         name="challenge"
         options={{
           href: null,
