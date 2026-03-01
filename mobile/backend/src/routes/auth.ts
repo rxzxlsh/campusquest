@@ -9,7 +9,8 @@ const JWT_SECRET = process.env.JWT_SECRET ?? 'campusquest_secret';
 const UOFT_DOMAINS = ['utoronto.ca', 'mail.utoronto.ca'];
 const memoryUsers = new Map<string, { id: string; email: string; username?: string; password: string }>();
 
-const isUofTEmail = (email: string) => {
+const isUofTEmail = (email?: string) => {
+  if (!email || typeof email !== 'string' || !email.includes('@')) return false;
   const domain = email.split('@')[1];
   return UOFT_DOMAINS.includes(domain);
 };
@@ -18,6 +19,10 @@ const isMongoReady = () => mongoose.connection.readyState === 1;
 
 router.post('/signup', async (req, res) => {
   const { email, password, username } = req.body;
+
+  if (!email || !password || !username) {
+    return res.status(400).json({ error: 'Missing required fields: email, password, username' });
+  }
 
   if (!isUofTEmail(email)) {
     return res.status(403).json({ error: 'UofT students only! Please use a@utoronto.ca or @mail.utoronto.ca email' });
@@ -51,6 +56,10 @@ router.post('/signup', async (req, res) => {
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Missing required fields: email, password' });
+  }
 
   try {
     if (isMongoReady()) {
