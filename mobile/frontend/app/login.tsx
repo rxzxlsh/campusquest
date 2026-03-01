@@ -1,102 +1,135 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-WebBrowser.maybeCompleteAuthSession();
-
-const AUTH0_DOMAIN = 'dev-jl3xn54tmzhm3rht.us.auth0.com';
-const AUTH0_CLIENT_ID = '0Xwor21YhOl8CQ2hhllVSZ9fg0al7dca';
-
-const redirectUri = __DEV__
-  ? 'https://auth.expo.io/@evarosati/frontend'
-  : AuthSession.makeRedirectUri({ scheme: 'frontend' });
+const API_URL = 'http://100.114.28.255:4010';
 
 export default function LoginScreen() {
-  const [error, setError] = React.useState<string | null>(null);
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: AUTH0_CLIENT_ID,
-      redirectUri,
-      scopes: ['openid', 'profile', 'email'],
-      extraParams: { audience: 'https://campusquest-api' },
-    },
-    {
-      authorizationEndpoint: `https://${AUTH0_DOMAIN}/authorize`,
-    }
-  );
+  const saveAndRedirect = async (token: string, user: object) => {
+    await AsyncStorage.setItem('token', token);
+    await AsyncStorage.setItem('user', JSON.stringify(user));
+    router.replace('/(tabs)');
+  };
 
-  React.useEffect(() => {
-    if (response?.type === 'success') {
-      const { code } = response.params;
-      exchangeToken(code);
-    } else if (response?.type === 'error') {
-      const desc = response.error?.description ?? response.params?.error_description;
-      if (desc?.includes('UofT') || desc?.includes('restricted')) {
-        setError('🎓 This app is for UofT students only.\nPlease use your @utoronto.ca or @mail.utoronto.ca email.');
-      } else {
-        setError('Login failed. Please try again.');
-      }
-    }
-  }, [response]);
+  const handleSubmit = async () => {
+    if (!email || !password) return Alert.alert('Error', 'Please fill in all fields');
+    if (!isLogin && !username) return Alert.alert('Error', 'Please enter a username');
 
-  const exchangeToken = async (code: string) => {
+    setLoading(true);
     try {
-      const tokenResponse = await fetch(`https://${AUTH0_DOMAIN}/oauth/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          grant_type: 'authorization_code',
-          client_id: AUTH0_CLIENT_ID,
-          code_verifier: request?.codeVerifier,
-          code,
-          redirect_uri: redirectUri,
-        }),
-      });
+      if (!isLogin) {
+        // SIGNUP then auto LOGIN
+        const signupRes = await fetch(`${API_URL}/api/auth/signup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, username }),
+        });
+        const signupData = await signupRes.json();
+        if (!signupRes.ok) return Alert.alert('Error', signupData.error);
 
-      const tokenData = await tokenResponse.json();
+        // auto login after signup
+        const loginRes = await fetch(`${API_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const loginData = await loginRes.json();
+        if (!loginRes.ok) return Alert.alert('Error', loginData.error);
 
-      if (tokenData.access_token) {
-        router.replace('/(tabs)');
+        await saveAndRedirect(loginData.token, loginData.user);
       } else {
-        setError('Login failed. Please try again.');
+        // LOGIN
+        const res = await fetch(`${API_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) return Alert.alert('Error', data.error);
+
+        await saveAndRedirect(data.token, data.user);
       }
-    } catch (e) {
-      setError('Login failed. Please try again.');
+    } catch (err) {
+      Alert.alert('Error', 'Could not connect to server');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>CampusQuest</Text>
-      <Text style={styles.subtitle}>UofT Students Only</Text>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+      <Text style={styles.title}>CampusQuest 🎓</Text>
+      <Text style={styles.subtitle}>{isLogin ? 'Welcome back!' : 'Create your account'}</Text>
+      <Text style={styles.uoftNote}>UofT Students Only (@utoronto.ca)</Text>
 
-      {error && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
+      <View style={styles.form}>
+        {!isLogin && (
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Username</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. johnsmith"
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+            />
+          </View>
+        )}
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>UofT Email</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="yourname@utoronto.ca"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
         </View>
-      )}
 
-      <TouchableOpacity
-        style={[styles.button, !request && styles.buttonDisabled]}
-        onPress={() => { setError(null); promptAsync(); }}
-        disabled={!request}
-      >
-        <Text style={styles.buttonText}>Login with UofT Email</Text>
-      </TouchableOpacity>
-    </View>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+        </View>
+
+        <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
+          <Text style={styles.buttonText}>{loading ? 'Loading...' : isLogin ? 'Login' : 'Sign Up'}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
+          <Text style={styles.switchText}>
+            {isLogin ? "Don't have an account? Sign Up" : 'Already have an account? Login'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
-  title: { fontSize: 32, fontWeight: 'bold', marginBottom: 10 },
-  subtitle: { fontSize: 16, color: 'gray', marginBottom: 40 },
-  errorBox: { backgroundColor: '#fff3f3', borderColor: '#ff4444', borderWidth: 1, borderRadius: 8, padding: 15, marginBottom: 20, width: '80%' },
-  errorText: { color: '#cc0000', textAlign: 'center', lineHeight: 22 },
-  button: { backgroundColor: '#002A5C', padding: 15, borderRadius: 10, width: '80%', alignItems: 'center' },
-  buttonDisabled: { opacity: 0.5 },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', padding: 20 },
+  title: { fontSize: 36, fontWeight: 'bold', marginBottom: 8 },
+  subtitle: { fontSize: 18, color: '#333', marginBottom: 4 },
+  uoftNote: { fontSize: 13, color: '#888', marginBottom: 30 },
+  form: { width: '100%' },
+  inputGroup: { marginBottom: 16 },
+  label: { fontSize: 14, fontWeight: '600', color: '#002A5C', marginBottom: 6 },
+  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 14, fontSize: 16, backgroundColor: '#f9f9f9' },
+  button: { backgroundColor: '#002A5C', padding: 16, borderRadius: 10, alignItems: 'center', marginTop: 10, marginBottom: 16 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  switchText: { color: '#002A5C', fontSize: 14, textAlign: 'center' },
 });
