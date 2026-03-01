@@ -54,11 +54,6 @@ const ITEM_OVERLAYS: Record<string, PixelGrid> = {
     ["#1a5fa8", "#1a5fa8", "#1a5fa8", "#1a5fa8", "#1a5fa8", "#1a5fa8", "#1a5fa8", "#1a5fa8"],
     ...Array(14).fill(Array(8).fill(null)),
   ],
-  HAT_GHOST: [
-    [null, "#c8b4ff", "#c8b4ff", "#c8b4ff", "#c8b4ff", "#c8b4ff", "#c8b4ff", null],
-    ["#c8b4ff", "#ddd0ff", "#c8b4ff", "#c8b4ff", "#c8b4ff", "#c8b4ff", "#ddd0ff", "#c8b4ff"],
-    ...Array(14).fill(Array(8).fill(null)),
-  ],
   HAT_PROF: [
     [null, "#1a1a1a", "#1a1a1a", "#1a1a1a", "#1a1a1a", "#1a1a1a", "#1a1a1a", null],
     ["#1a1a1a", "#1a1a1a", "#2a2a2a", "#2a2a2a", "#2a2a2a", "#2a2a2a", "#1a1a1a", "#1a1a1a"],
@@ -87,6 +82,15 @@ const ITEM_OVERLAYS: Record<string, PixelGrid> = {
     ["#1a1a1a", "#2a2a2a", "#1a1a1a", "#1a1a1a", "#1a1a1a", "#1a1a1a", "#2a2a2a", "#1a1a1a"],
     ["#1a1a1a", "#1a1a1a", "#1a1a1a", "#1a1a1a", "#1a1a1a", "#1a1a1a", "#1a1a1a", "#1a1a1a"],
     [null, "#1a1a1a", "#1a1a1a", "#1a1a1a", "#1a1a1a", "#1a1a1a", "#1a1a1a", null],
+    ...Array(6).fill(Array(8).fill(null)),
+  ],
+  HOODIE_GHOST: [
+    ...Array(5).fill(Array(8).fill(null)),
+    [null, "#9c7bff", "#9c7bff", "#9c7bff", "#9c7bff", "#9c7bff", "#9c7bff", null],
+    ["#9c7bff", "#b29eff", "#e6ddff", "#9c7bff", "#9c7bff", "#e6ddff", "#b29eff", "#9c7bff"],
+    ["#9c7bff", "#b29eff", "#9c7bff", "#9c7bff", "#9c7bff", "#9c7bff", "#b29eff", "#9c7bff"],
+    ["#9c7bff", "#9c7bff", "#9c7bff", "#9c7bff", "#9c7bff", "#9c7bff", "#9c7bff", "#9c7bff"],
+    [null, "#9c7bff", "#9c7bff", "#9c7bff", "#9c7bff", "#9c7bff", "#9c7bff", null],
     ...Array(6).fill(Array(8).fill(null)),
   ],
   TOP_SPORT: [

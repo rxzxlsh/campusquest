@@ -8,9 +8,12 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
+  Dimensions,
+  SafeAreaView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { getApiBaseUrl } from "@/constants/api";
+import GalaxyBackground from "@/components/GalaxyBackground";
 
 type Challenge = {
   id: string;
@@ -26,16 +29,16 @@ type StartPayload = { success?: boolean; message?: string; error?: string };
 
 type SubmitPayload =
   | {
-      success: true;
-      message: string;
-      challengeId: string;
-      userId: string;
-      walletAddress: string;
-      rewardLamports?: number;
-      rewardTxSignature?: string;
-      error?: string;
-      alreadyClaimed?: boolean;
-    }
+    success: true;
+    message: string;
+    challengeId: string;
+    userId: string;
+    walletAddress: string;
+    rewardLamports?: number;
+    rewardTxSignature?: string;
+    error?: string;
+    alreadyClaimed?: boolean;
+  }
   | { success: false; message?: string; error?: string };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -153,6 +156,12 @@ export default function PlayScreen() {
       // Success
       const p = payload as Extract<SubmitPayload, { success: true }>;
 
+      // If already claimed, throw error instead of giving win
+      if (p.alreadyClaimed) {
+        Alert.alert("Already Claimed", "You have already completed this challenge and claimed its rewards!");
+        return; // Loudly block and stay on screen
+      }
+
       // If reward signature exists, show "win" flow
       if (p.rewardTxSignature) {
         router.replace({
@@ -162,20 +171,6 @@ export default function PlayScreen() {
             result: "win",
             rewardLamports: String(p.rewardLamports ?? ""),
             rewardTxSignature: p.rewardTxSignature,
-          },
-        });
-        return;
-      }
-
-      // If already claimed, still treat as win-ish (your lobby will alert “Submitted” otherwise)
-      if (p.alreadyClaimed) {
-        router.replace({
-          pathname: "/(tabs)/challenge",
-          params: {
-            challengeId: challenge.id,
-            result: "win",
-            rewardLamports: String(p.rewardLamports ?? ""),
-            rewardTxSignature: "",
           },
         });
         return;
@@ -210,25 +205,8 @@ export default function PlayScreen() {
   if (!challenge) return null;
 
   return (
-    <View style={styles.screen}>
-      {/* subtle background layer */}
-      <View pointerEvents="none" style={styles.starsLayer}>
-        {Array.from({ length: 14 }).map((_, i) => (
-          <View
-            key={i}
-            style={[
-              styles.star,
-              {
-                left: ((i * 71) % 330) + 18,
-                top: ((i * 97) % 640) + 18,
-                width: 2 + ((i * 7) % 3),
-                height: 2 + ((i * 7) % 3),
-                opacity: 0.25 + (((i * 9) % 50) / 100),
-              },
-            ]}
-          />
-        ))}
-      </View>
+    <SafeAreaView style={styles.screen}>
+      <GalaxyBackground />
 
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
@@ -247,7 +225,7 @@ export default function PlayScreen() {
           </View>
           <View style={styles.metaPill}>
             <Text style={styles.metaPillLabel}>Reward</Text>
-            <Text style={styles.metaPillValue}>{challenge.rewardLamports} lamports</Text>
+            <Text style={styles.metaPillValue}>{(challenge.rewardLamports / 1_000_000_000).toFixed(4)} SOL</Text>
           </View>
         </View>
 
@@ -323,23 +301,14 @@ export default function PlayScreen() {
           <Text style={styles.ghostButtonText}>Back</Text>
         </Pressable>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#030d26",
-  },
-  starsLayer: {
-    position: "absolute",
-    inset: 0,
-  },
-  star: {
-    position: "absolute",
-    borderRadius: 999,
-    backgroundColor: "#cce7ff",
+    backgroundColor: "#020815",
   },
 
   container: {
@@ -398,57 +367,59 @@ const styles = StyleSheet.create({
 
   metaRow: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 4,
+    justifyContent: "space-evenly",
+    alignItems: "center",
+    backgroundColor: "rgba(4, 18, 50, 0.5)",
+    borderRadius: 16,
+    paddingVertical: 14,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "rgba(75, 140, 224, 0.3)",
   },
   metaPill: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#2b5da8",
-    backgroundColor: "rgba(7, 24, 53, 0.88)",
-    borderRadius: 12,
-    padding: 12,
-    minHeight: 72,
-    justifyContent: "space-between",
+    alignItems: "center",
+    width: "48%",
   },
   metaPillLabel: {
-    color: "#9ecaf7",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.45,
+    color: "#5fa4f5",
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 2,
+    letterSpacing: 1,
     textTransform: "uppercase",
   },
   metaPillValue: {
-    color: "#eef7ff",
-    fontSize: 18,
+    color: "#ffffff",
+    fontSize: 20,
     fontWeight: "900",
   },
 
   card: {
     borderWidth: 1,
-    borderColor: "#2f67b7",
-    backgroundColor: "rgba(8, 27, 60, 0.9)",
-    borderRadius: 14,
-    padding: 14,
-    gap: 10,
+    borderColor: "rgba(84, 158, 245, 0.25)",
+    backgroundColor: "rgba(3, 10, 26, 0.6)",
+    borderRadius: 16,
+    padding: 16,
+    gap: 8,
+    marginBottom: 20,
   },
   cardLabel: {
-    color: "#bfe0ff",
-    fontWeight: "800",
-    fontSize: 12,
-    letterSpacing: 0.6,
+    color: "#468de0",
+    fontSize: 11,
+    fontWeight: "900",
+    marginBottom: 4,
+    letterSpacing: 1.2,
     textTransform: "uppercase",
   },
   prompt: {
-    color: "#d5e9ff",
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: "600",
+    color: "#c9e4ff",
+    fontSize: 15,
+    lineHeight: 24,
+    fontWeight: "500",
   },
 
   identityCard: {
     flexDirection: "row",
-    alignItems: "center",
     gap: 12,
     borderWidth: 1,
     borderColor: "#356dc3",
@@ -484,13 +455,13 @@ const styles = StyleSheet.create({
 
   input: {
     borderWidth: 1,
-    borderColor: "#326dc2",
+    borderColor: "rgba(50, 109, 194, 0.5)",
     borderRadius: 10,
-    backgroundColor: "rgba(3, 15, 42, 0.95)",
+    backgroundColor: "rgba(12, 29, 66, 0.55)",
     color: "#f1f7ff",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
   },
   helper: {
     color: "#b7dcff",
@@ -501,30 +472,32 @@ const styles = StyleSheet.create({
 
   optionButton: {
     borderWidth: 1,
-    borderColor: "#326dc2",
+    borderColor: "rgba(50, 109, 194, 0.5)",
     borderRadius: 12,
-    backgroundColor: "rgba(3, 15, 42, 0.95)",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    backgroundColor: "rgba(12, 29, 66, 0.55)",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
   optionButtonActive: {
-    borderColor: "#9bd7ff",
-    backgroundColor: "rgba(12, 44, 93, 0.95)",
+    borderColor: "#82c8ff",
+    backgroundColor: "rgba(22, 60, 133, 0.75)",
   },
   optionText: {
     color: "#d9edff",
     fontWeight: "800",
+    fontSize: 15,
   },
   optionTextActive: {
-    color: "#f4faff",
+    color: "#ffffff",
+    fontWeight: "900",
   },
 
   primaryButton: {
-    backgroundColor: "#0f56c6",
-    borderRadius: 12,
-    paddingVertical: 13,
+    backgroundColor: "#1650b0",
+    borderRadius: 16,
+    paddingVertical: 16,
     alignItems: "center",
-    marginTop: 2,
+    marginTop: 10,
   },
   primaryButtonDisabled: {
     opacity: 0.7,

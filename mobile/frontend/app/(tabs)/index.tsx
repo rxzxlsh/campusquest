@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import {
-  ActivityIndicator,
   Animated,
   Easing,
   Pressable,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +12,8 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import { getApiBaseUrl } from "@/constants/api";
+import AvatarRenderer from "@/components/AvatarRenderer";
+import GalaxyBackground from "@/components/GalaxyBackground";
 import {
   clearAllSession,
   getStoredToken,
@@ -19,112 +21,141 @@ import {
   getStoredWalletAddress,
   getWalletOwnerUserId,
 } from "@/constants/session";
+import {
+  MILESTONES,
+  getCurrentMilestone,
+  getNextMilestone,
+  getProgressToNext,
+  type Milestone,
+} from "@/constants/milestones";
 
-type CompletionRecord = {
-  challengeId: string;
-  challengeClub: string;
-  rewardLamports: number;
-  rewardTxSignature: string;
-  rewardTxUrl: string;
-  completedAt: string;
-};
-
+// ─── Types ────────────────────────────────────────────────────────────────────
 type ProfileResponse = {
   userId: string;
   walletAddress: string;
   totalRewardLamports: number;
   totalRewardSol: number;
-  completedChallenges: CompletionRecord[];
-  error?: string;
+  completedChallenges: { challengeId: string }[];
+  xp?: number;
+  equippedItems?: string[];
 };
 
 const API_BASE_URL = getApiBaseUrl();
 
-const STAR_FIELD = Array.from({ length: 24 }, (_value, index) => ({
-  id: `star-${index}`,
-  top: Math.floor(Math.random() * 720) + 10,
-  left: Math.floor(Math.random() * 360) + 6,
-  size: Math.floor(Math.random() * 3) + 2,
-  opacity: 0.18 + Math.random() * 0.5,
-}));
-
-function shortenWallet(value: string) {
+// ─── Utilities ────────────────────────────────────────────────────────────────
+function shortenWallet(value: string | undefined) {
   if (!value) return "Unlinked";
   if (value.length <= 12) return value;
   return `${value.slice(0, 6)}...${value.slice(-6)}`;
 }
 
-function resolveRole(totalCompleted: number) {
-  if (totalCompleted >= 12) return "Protocol Architect";
-  if (totalCompleted >= 8) return "Innovation Vanguard";
-  if (totalCompleted >= 4) return "Campus Pathfinder";
-  return "Quest Recruit";
-}
-
-function challengeGlyph(challengeId: string) {
-  if (challengeId.startsWith("CODING")) return "💻";
-  if (challengeId.startsWith("GREEN")) return "🌱";
-  if (challengeId.startsWith("PHOTO")) return "📸";
-  if (challengeId.startsWith("FIT")) return "🏃";
-  return "🧩";
-}
-
-export default function ProfileScreen() {
-  const [userId, setUserId] = useState("");
-  const [sessionWallet, setSessionWallet] = useState("");
-  const [sessionReady, setSessionReady] = useState(false);
-  const [profile, setProfile] = useState<ProfileResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [errorText, setErrorText] = useState<string | null>(null);
-
-  const pulse = useRef(new Animated.Value(0)).current;
-  const orbit = useRef(new Animated.Value(0)).current;
-  const sparkle = useRef(new Animated.Value(0)).current;
+// ─── Walking Animation ────────────────────────────────────────────────────────
+function useWalkAnimation() {
+  const bounce = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 1600,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0,
-          duration: 1600,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
+        Animated.timing(bounce, { toValue: -6, duration: 280, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(bounce, { toValue: 0, duration: 280, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
       ])
     ).start();
+  }, [bounce]);
 
-    Animated.loop(
-      Animated.timing(orbit, {
-        toValue: 1,
-        duration: 9000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    ).start();
+  return bounce;
+}
 
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(sparkle, {
-          toValue: 1,
-          duration: 1400,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(sparkle, {
-          toValue: 0,
-          duration: 1400,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [orbit, pulse, sparkle]);
+// ─── Milestone Node ───────────────────────────────────────────────────────────
+function MilestoneNode({
+  milestone,
+  isUnlocked,
+  isCurrent,
+  isPlayer,
+  onPress,
+  bounce,
+}: {
+  milestone: Milestone;
+  isUnlocked: boolean;
+  isCurrent: boolean;
+  isPlayer: boolean;
+  onPress: () => void;
+  bounce: Animated.Value;
+  equippedItems: string[];
+}) {
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isCurrent) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(glowAnim, { toValue: 0, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ])
+      ).start();
+    }
+  }, [isCurrent, glowAnim]);
+
+  const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.9] });
+
+  return (
+    <Pressable onPress={onPress} style={styles.nodeRow}>
+      {/* Connector line above */}
+      <View style={[styles.connector, { backgroundColor: isUnlocked ? milestone.color : "#1d3d6b" }]} />
+
+      {/* Node circle */}
+      <View style={styles.nodeOuter}>
+        {isCurrent && (
+          <Animated.View style={[styles.nodeGlow, { backgroundColor: milestone.color, opacity: glowOpacity }]} />
+        )}
+        <View
+          style={[
+            styles.nodeCircle,
+            {
+              backgroundColor: isUnlocked ? milestone.color + "33" : "#0a1e42",
+              borderColor: isUnlocked ? milestone.color : "#1d3d6b",
+              opacity: isUnlocked ? 1 : 0.5,
+            },
+          ]}
+        >
+          <Text style={styles.nodeEmoji}>{isUnlocked ? milestone.character : "🔒"}</Text>
+        </View>
+
+        {/* Player avatar sits above their current milestone */}
+        {isPlayer && (
+          <Animated.View style={[styles.playerOnNode, { transform: [{ translateY: bounce }] }]}>
+            <View style={styles.playerShadow} />
+          </Animated.View>
+        )}
+      </View>
+
+      {/* Label card */}
+      <View style={[styles.nodeLabel, { borderColor: isUnlocked ? milestone.color + "55" : "#1d3d6b" }]}>
+        <Text style={[styles.nodeLabelTitle, { color: isUnlocked ? milestone.color : "#3d6090" }]}>
+          {milestone.title}
+        </Text>
+        <Text style={styles.nodeLabelXp}>
+          {isUnlocked ? "✓ Reached" : `${milestone.xpRequired} XP needed`}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+export default function NewProfileGamifiedScreen() {
+  const [userId, setUserId] = useState("");
+  const [username, setUsername] = useState("");
+  const [sessionWallet, setSessionWallet] = useState("");
+  const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [cadRate, setCadRate] = useState<number | null>(null);
+
+  // Modals
+  const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null);
+  const [showWalletMenu, setShowWalletMenu] = useState(false);
+
+  const bounce = useWalkAnimation();
+  const scrollRef = useRef<ScrollView>(null);
 
   const loadSession = useCallback(async () => {
     const [token, user, walletAddress, walletOwnerUserId] = await Promise.all([
@@ -138,16 +169,51 @@ export default function ProfileScreen() {
       router.replace("/login");
       return null;
     }
-
     if (!walletAddress || walletOwnerUserId !== user.id) {
       router.replace("/wallet");
       return null;
     }
 
     setUserId(user.id);
+    setUsername(user.username || user.email?.split('@')[0] || "");
     setSessionWallet(walletAddress);
-    setSessionReady(true);
     return { userId: user.id, walletAddress };
+  }, []);
+
+  const loadProfile = useCallback(async () => {
+    const session = await loadSession();
+    if (!session?.userId) return;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/${session.userId}/profile`);
+      if (!res.ok) throw new Error("Profile not found");
+      const data = (await res.json()) as ProfileResponse;
+      setProfile(data);
+    } catch {
+      setProfile(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadSession]);
+
+  useFocusEffect(useCallback(() => { void loadProfile(); }, [loadProfile]));
+
+  // Fetch live SOL to CAD rate
+  useEffect(() => {
+    const fetchRate = async () => {
+      try {
+        const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=cad");
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.solana?.cad) {
+            setCadRate(data.solana.cad);
+          }
+        }
+      } catch (err) {
+        // Silently fail if CoinGecko is unreachable, we just won't show the CAD rate
+      }
+    };
+    void fetchRate();
   }, []);
 
   const handleLogout = async () => {
@@ -155,454 +221,447 @@ export default function ProfileScreen() {
     router.replace("/login");
   };
 
-  const loadProfile = useCallback(async () => {
-    const session = await loadSession();
-    if (!session?.userId) return;
+  // Derive XP from completedChallenges if xp field not present (backwards compat)
+  const xp = profile?.xp ?? (profile?.completedChallenges.length ?? 0) * 125;
+  const equippedItems = profile?.equippedItems ?? ["HAT_DEFAULT", "TOP_DEFAULT"];
+  const currentMilestone = getCurrentMilestone(xp);
+  const nextMilestone = getNextMilestone(xp);
+  const progress = getProgressToNext(xp);
+  const sol = profile?.totalRewardSol ?? 0;
 
-    setLoading(true);
-    setErrorText(null);
-    try {
-      const response = await fetch(`${API_BASE_URL}/users/${session.userId}/profile`);
-      const payload = (await response.json()) as ProfileResponse;
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to load profile");
-      }
-      setProfile(payload);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to load profile";
-      setErrorText(message);
-      setProfile(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [loadSession]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void loadProfile();
-    }, [loadProfile])
-  );
-
-  const totalCompleted = profile?.completedChallenges.length ?? 0;
-  const inferredXp = totalCompleted * 125;
-  const level = Math.max(1, Math.floor(totalCompleted / 3) + 1);
-  const levelProgress = Math.min(1, (totalCompleted % 3) / 3);
-  const questsToNextTier = totalCompleted % 3 === 0 ? 3 : 3 - (totalCompleted % 3);
-  const role = resolveRole(totalCompleted);
-  const effectiveWallet = profile?.walletAddress || sessionWallet;
-
-  const rotation = orbit.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
-  const pulseScale = pulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.1],
-  });
-  const auraOpacity = sparkle.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 0.8],
-  });
-  const progressWidth = useMemo(() => `${Math.round(levelProgress * 100)}%` as `${number}%`, [levelProgress]);
+  // Reversed so path reads bottom (start) to top (end) like a real journey
+  const orderedMilestones = [...MILESTONES].reverse();
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.starsLayer} pointerEvents="none">
-        {STAR_FIELD.map((star) => (
-          <View
-            key={star.id}
-            style={[
-              styles.star,
-              {
-                top: star.top,
-                left: star.left,
-                width: star.size,
-                height: star.size,
-                opacity: star.opacity,
-              },
-            ]}
-          />
-        ))}
-      </View>
+    <SafeAreaView style={styles.screen}>
+      <GalaxyBackground />
 
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Innovation Identity</Text>
-        <Text style={styles.subtitle}>UTM Campus Quest Protocol</Text>
-
-        <View style={styles.searchCard}>
-          <Text style={styles.label}>Authenticated UofT Pilot</Text>
-          <Text style={styles.sessionValue}>{sessionReady ? userId : "Loading..."}</Text>
-          <Text style={styles.label}>Linked Phantom Wallet</Text>
-          <Text style={styles.sessionValue}>{shortenWallet(effectiveWallet)}</Text>
-          <View style={styles.buttonRow}>
-            <Pressable style={styles.refreshButton} onPress={loadProfile}>
-              <Text style={styles.refreshButtonText}>Sync Profile</Text>
-            </Pressable>
-            <Pressable style={styles.logoutButton} onPress={handleLogout}>
-              <Text style={styles.logoutButtonText}>Logout</Text>
-            </Pressable>
-          </View>
+      {/* ── Top HUD ── */}
+      <Pressable style={styles.hud} onPress={() => setShowWalletMenu(true)}>
+        <View style={styles.hudLeft}>
+          <AvatarRenderer equippedItems={equippedItems} pixelSize={5} />
         </View>
-
-        {loading ? (
-          <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color="#7fc8ff" />
-            <Text style={styles.loadingText}>Calibrating orbit data...</Text>
+        <View style={styles.hudCenter}>
+          <Text style={styles.hudName}>{username || userId || "Pilot"}</Text>
+          <Text style={styles.hudRole}>{currentMilestone.title}</Text>
+          <View style={styles.xpBarTrack}>
+            <View style={[styles.xpBarFill, { width: `${Math.round(progress * 100)}%` as `${number}%`, backgroundColor: currentMilestone.color }]} />
           </View>
-        ) : null}
+          <Text style={styles.xpText}>
+            {xp} XP{nextMilestone ? ` → ${nextMilestone.xpRequired} XP` : " — MAX"}
+          </Text>
+        </View>
+        <View style={styles.hudRight}>
+          <Text style={styles.coinAmount}>{sol.toFixed(4)}</Text>
+          <Text style={styles.coinLabel}>SOL</Text>
+        </View>
+      </Pressable>
 
-        {errorText ? <Text style={styles.errorText}>{errorText}</Text> : null}
+      {/* ── Path ── */}
+      <ScrollView
+        ref={scrollRef}
+        style={styles.pathScroll}
+        contentContainerStyle={styles.pathContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.pathHeader}>🗺️ UTM Quest Path — Season 1</Text>
 
-        {profile ? (
-          <>
-            <View style={styles.identityCard}>
-              <Animated.View style={[styles.aura, { opacity: auraOpacity, transform: [{ scale: pulseScale }] }]} />
+        {orderedMilestones.map((milestone) => {
+          const isUnlocked = xp >= milestone.xpRequired;
+          const isCurrent = milestone.id === currentMilestone.id;
+          const isPlayer = nextMilestone?.id === milestone.id;
 
-              <Animated.View style={[styles.orbitRing, { transform: [{ rotate: rotation }] }]}>
-                <View style={styles.orbitDot} />
-              </Animated.View>
+          return (
+            <MilestoneNode
+              key={milestone.id}
+              milestone={milestone}
+              isUnlocked={isUnlocked}
+              isCurrent={isCurrent}
+              isPlayer={isPlayer}
+              onPress={() => setSelectedMilestone(milestone)}
+              bounce={bounce}
+              equippedItems={equippedItems}
+            />
+          );
+        })}
 
-              <View style={styles.avatarCore}>
-                <Text style={styles.avatarGlyph}>🛰️</Text>
-              </View>
+        <View style={{ height: 40 }} />
+      </ScrollView>
 
-              <Text style={styles.userIdText}>{profile.userId}</Text>
-              <Text style={styles.roleText}>{role}</Text>
-              <Text style={styles.walletText}>Wallet {shortenWallet(effectiveWallet)}</Text>
+      {/* ── Wallet / Settings Modal (HUD Expand) ── */}
+      {showWalletMenu && (
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowWalletMenu(false)}>
+          <Pressable style={styles.settingsModal} onPress={() => { }}>
+            <Text style={styles.settingsTitle}>Profile Settings</Text>
+
+            <View style={styles.settingsBox}>
+              <Text style={styles.settingsLabel}>Linked Solana Wallet</Text>
+              <Text style={styles.settingsValue}>{shortenWallet(profile?.walletAddress || sessionWallet)}</Text>
             </View>
 
-            <View style={styles.metricsGrid}>
-              <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>Innovation XP</Text>
-                <Text style={styles.metricValue}>{inferredXp}</Text>
-              </View>
-              <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>Explorer Level</Text>
-                <Text style={styles.metricValue}>Lv {level}</Text>
-              </View>
-              <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>Rewards (LAMPORTS)</Text>
-                <Text style={styles.metricValue}>{profile.totalRewardLamports}</Text>
-              </View>
-              <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>Rewards (SOL)</Text>
-                <Text style={styles.metricValue}>{profile.totalRewardSol.toFixed(9)}</Text>
-              </View>
-            </View>
-
-            <View style={styles.progressCard}>
-              <Text style={styles.progressTitle}>Rank Progress To Next Tier</Text>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: progressWidth }]} />
-              </View>
-              <Text style={styles.progressMeta}>
-                Completed Quests: {totalCompleted} | Next Tier In {questsToNextTier} quest(s)
-              </Text>
-            </View>
-
-            <View style={styles.timelineCard}>
-              <Text style={styles.timelineTitle}>Mission Log</Text>
-              {profile.completedChallenges.length === 0 ? (
-                <Text style={styles.emptyText}>No missions completed yet. Scan a quest to unlock your first badge.</Text>
-              ) : (
-                profile.completedChallenges.map((item) => (
-                  <View key={`${item.challengeId}-${item.rewardTxSignature}`} style={styles.missionRow}>
-                    <View style={styles.missionIcon}>
-                      <Text style={styles.missionIconText}>{challengeGlyph(item.challengeId)}</Text>
-                    </View>
-                    <View style={styles.missionTextWrap}>
-                      <Text style={styles.missionTitle}>
-                        {item.challengeId} | {item.challengeClub}
-                      </Text>
-                      <Text style={styles.missionMeta}>Reward {item.rewardLamports} lamports</Text>
-                      <Text style={styles.missionMeta}>Tx {item.rewardTxSignature.slice(0, 18)}...</Text>
-                    </View>
-                  </View>
-                ))
+            <View style={styles.settingsBox}>
+              <Text style={styles.settingsLabel}>Total Balance</Text>
+              <Text style={styles.settingsValue}>{profile?.totalRewardSol?.toFixed(6) ?? "0.000000"} SOL</Text>
+              {cadRate !== null && profile?.totalRewardSol !== undefined && (
+                <Text style={styles.settingsLabelSub}>
+                  ≈ ${(profile.totalRewardSol * cadRate).toFixed(2)} CAD
+                </Text>
               )}
             </View>
-          </>
-        ) : null}
-      </ScrollView>
-    </View>
+
+            <View style={styles.settingsActions}>
+              <Pressable style={styles.btnSync} onPress={() => { loadProfile(); setShowWalletMenu(false); }}>
+                <Text style={styles.btnSyncText}>Sync Data</Text>
+              </Pressable>
+              <Pressable style={styles.btnLogout} onPress={handleLogout}>
+                <Text style={styles.btnLogoutText}>Logout</Text>
+              </Pressable>
+            </View>
+
+            <Pressable style={styles.btnCancel} onPress={() => setShowWalletMenu(false)}>
+              <Text style={styles.btnCancelText}>Close</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      )}
+
+      {/* ── Milestone Detail Modal ── */}
+      {selectedMilestone && (
+        <Pressable style={styles.modalBackdrop} onPress={() => setSelectedMilestone(null)}>
+          <Pressable style={styles.milestoneModal} onPress={() => { }}>
+            <Text style={styles.milestoneModalEmoji}>{selectedMilestone.character}</Text>
+            <Text style={[styles.milestoneModalTitle, { color: selectedMilestone.color }]}>
+              {selectedMilestone.title}
+            </Text>
+            <Text style={styles.milestoneModalDesc}>{selectedMilestone.description}</Text>
+            <Text style={styles.milestoneModalReward}>{selectedMilestone.rewardHint}</Text>
+            <View style={[styles.milestoneXpBadge, { backgroundColor: selectedMilestone.color + "22", borderColor: selectedMilestone.color }]}>
+              <Text style={[styles.milestoneXpBadgeText, { color: selectedMilestone.color }]}>
+                {xp >= selectedMilestone.xpRequired ? "✓ REACHED" : `${selectedMilestone.xpRequired} XP required`}
+              </Text>
+            </View>
+            <Pressable style={styles.btnCancel} onPress={() => setSelectedMilestone(null)}>
+              <Text style={styles.btnCancelText}>Close</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      )}
+
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <Text style={styles.loadingText}>Loading your quest path...</Text>
+        </View>
+      )}
+    </SafeAreaView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#030d26",
+    backgroundColor: "#020b1f",
   },
-  starsLayer: {
-    position: "absolute",
-    inset: 0,
-  },
-  star: {
-    position: "absolute",
-    borderRadius: 999,
-    backgroundColor: "#cce7ff",
-  },
-  container: {
-    paddingHorizontal: 18,
-    paddingTop: 24,
-    paddingBottom: 36,
-    gap: 14,
-  },
-  title: {
-    color: "#e4f1ff",
-    fontSize: 30,
-    fontWeight: "900",
-    letterSpacing: 0.4,
-  },
-  subtitle: {
-    color: "#8dc5ff",
-    fontSize: 14,
-    marginTop: -6,
+
+  // HUD
+  hud: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "rgba(12, 29, 66, 0.65)",
+    borderWidth: 1,
+    borderColor: "rgba(84, 158, 245, 0.25)",
+    borderRadius: 24,
+    marginHorizontal: 16,
+    marginTop: 8,
     marginBottom: 4,
+    shadowColor: "#05163a",
+    shadowOpacity: 0.6,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 6 },
+    gap: 12,
   },
-  searchCard: {
-    borderWidth: 1,
-    borderColor: "#1d4f94",
-    backgroundColor: "rgba(8, 29, 67, 0.88)",
-    borderRadius: 16,
-    padding: 14,
-    gap: 10,
+  hudLeft: {
+    width: 44,
+    height: 80,
+    alignItems: "center",
+    justifyContent: "flex-end",
   },
-  label: {
-    color: "#bfe0ff",
-    fontWeight: "700",
-    fontSize: 12,
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
+  hudCenter: {
+    flex: 1,
+    gap: 3,
   },
-  sessionValue: {
-    borderWidth: 1,
-    borderColor: "#326dc2",
-    borderRadius: 10,
-    backgroundColor: "rgba(3, 15, 42, 0.95)",
-    color: "#f1f7ff",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  hudName: {
+    color: "#e8f3ff",
+    fontWeight: "900",
     fontSize: 15,
   },
-  buttonRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 4,
+  hudRole: {
+    color: "#8dc5ff",
+    fontSize: 11,
+    fontWeight: "700",
   },
-  refreshButton: {
-    flex: 1,
-    backgroundColor: "#0f56c6",
-    borderRadius: 10,
-    paddingVertical: 11,
+  xpBarTrack: {
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: "#112244",
+    overflow: "hidden",
+    marginTop: 2,
+  },
+  xpBarFill: {
+    height: "100%",
+    borderRadius: 999,
+  },
+  xpText: {
+    color: "#9fcfff",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  hudRight: {
     alignItems: "center",
   },
-  refreshButtonText: {
+  coinAmount: {
+    color: "#ffd700", // Gold looks good for Lamports/SOL too
+    fontWeight: "900",
+    fontSize: 18,
+  },
+  coinLabel: {
+    color: "#b8a030",
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+
+  // Path
+  pathScroll: {
+    flex: 1,
+  },
+  pathContent: {
+    paddingHorizontal: 28,
+    paddingTop: 18,
+    alignItems: "center",
+  },
+  pathHeader: {
+    color: "#7fc8ff",
+    fontSize: 13,
+    fontWeight: "800",
+    marginBottom: 16,
+    letterSpacing: 0.5,
+  },
+
+  // Nodes
+  nodeRow: {
+    alignItems: "center",
+    width: "100%",
+  },
+  connector: {
+    width: 3,
+    height: 40,
+    borderRadius: 999,
+  },
+  nodeOuter: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 4,
+  },
+  nodeGlow: {
+    position: "absolute",
+    width: 72,
+    height: 72,
+    borderRadius: 999,
+  },
+  nodeCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 999,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nodeEmoji: {
+    fontSize: 28,
+  },
+  playerOnNode: {
+    position: "absolute",
+    top: -56,
+    alignItems: "center",
+  },
+  playerShadow: {
+    width: 24,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    marginTop: 2,
+  },
+  nodeLabel: {
+    marginTop: 8,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: "rgba(84, 158, 245, 0.3)",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    alignItems: "center",
+    backgroundColor: "rgba(12, 29, 66, 0.65)",
+    minWidth: 180,
+  },
+  nodeLabelTitle: {
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  nodeLabelXp: {
+    color: "#5a88c0",
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: "600",
+  },
+
+  // Modals
+  modalBackdrop: {
+    position: "absolute",
+    inset: 0,
+    backgroundColor: "rgba(0,6,22,0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  settingsModal: {
+    backgroundColor: "rgba(12, 29, 66, 0.9)",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(84, 158, 245, 0.4)",
+    padding: 24,
+    marginHorizontal: 24,
+    width: "85%",
+    gap: 12,
+  },
+  settingsTitle: {
+    color: "#e8f3ff",
+    fontSize: 19,
+    fontWeight: "900",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  settingsBox: {
+    backgroundColor: "rgba(4, 14, 38, 0.6)",
+    borderWidth: 1,
+    borderColor: "#1e3f7a",
+    padding: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  settingsLabel: {
+    color: "#7ab0e0",
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  settingsLabelSub: {
+    color: "#5a88c0",
+    fontSize: 10,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  settingsValue: {
+    color: "#f4fbff",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  settingsActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 8,
+  },
+  btnSync: {
+    flex: 1,
+    backgroundColor: "#0f56c6",
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  btnSyncText: {
     color: "#ecf5ff",
     fontWeight: "800",
-    letterSpacing: 0.4,
   },
-  logoutButton: {
+  btnLogout: {
     flex: 1,
     backgroundColor: "rgba(220, 38, 38, 0.8)",
     borderWidth: 1,
     borderColor: "rgba(239, 68, 68, 0.5)",
+    paddingVertical: 12,
     borderRadius: 10,
-    paddingVertical: 11,
     alignItems: "center",
   },
-  logoutButtonText: {
+  btnLogoutText: {
     color: "#ffe4e6",
     fontWeight: "800",
-    letterSpacing: 0.4,
   },
-  loadingCard: {
-    borderWidth: 1,
-    borderColor: "#1d4f94",
-    backgroundColor: "rgba(6, 25, 58, 0.86)",
-    borderRadius: 14,
-    paddingVertical: 22,
+  btnCancel: {
+    marginTop: 4,
+    paddingVertical: 12,
+    backgroundColor: "#112244",
+    borderRadius: 10,
     alignItems: "center",
-    gap: 8,
+  },
+  btnCancelText: {
+    color: "#9fc9f7",
+    fontWeight: "800",
+  },
+
+  milestoneModal: {
+    backgroundColor: "rgba(12, 29, 66, 0.9)",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(84, 158, 245, 0.4)",
+    padding: 24,
+    marginHorizontal: 24,
+    alignItems: "center",
+    gap: 10,
+  },
+  milestoneModalEmoji: {
+    fontSize: 48,
+  },
+  milestoneModalTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  milestoneModalDesc: {
+    color: "#d5e9ff",
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: "center",
+  },
+  milestoneModalReward: {
+    color: "#9fc9f7",
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  milestoneXpBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    marginTop: 4,
+  },
+  milestoneXpBadgeText: {
+    fontWeight: "800",
+    fontSize: 12,
+  },
+
+  // Loading
+  loadingOverlay: {
+    position: "absolute",
+    inset: 0,
+    backgroundColor: "rgba(2,11,31,0.85)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   loadingText: {
-    color: "#c8e5ff",
-    fontWeight: "600",
-  },
-  errorText: {
-    color: "#ff9da8",
+    color: "#7fc8ff",
     fontWeight: "700",
-  },
-  identityCard: {
-    borderWidth: 1,
-    borderColor: "#356dc3",
-    backgroundColor: "rgba(6, 24, 56, 0.9)",
-    borderRadius: 20,
-    paddingTop: 18,
-    paddingBottom: 16,
-    alignItems: "center",
-    overflow: "hidden",
-  },
-  aura: {
-    position: "absolute",
-    top: 24,
-    width: 140,
-    height: 140,
-    borderRadius: 999,
-    backgroundColor: "#2a77ff",
-  },
-  orbitRing: {
-    position: "absolute",
-    top: 20,
-    width: 148,
-    height: 148,
-    borderRadius: 999,
-    borderWidth: 1.2,
-    borderColor: "rgba(136, 201, 255, 0.8)",
-    alignItems: "center",
-  },
-  orbitDot: {
-    position: "absolute",
-    top: -4,
-    width: 9,
-    height: 9,
-    borderRadius: 999,
-    backgroundColor: "#ebf6ff",
-  },
-  avatarCore: {
-    width: 104,
-    height: 104,
-    borderRadius: 999,
-    backgroundColor: "#f4fbff",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 4,
-    borderColor: "#6cb5ff",
-    marginBottom: 12,
-    marginTop: 10,
-  },
-  avatarGlyph: {
-    fontSize: 44,
-  },
-  userIdText: {
-    color: "#f0f7ff",
-    fontSize: 19,
-    fontWeight: "800",
-  },
-  roleText: {
-    color: "#95ceff",
-    fontSize: 13,
-    marginTop: 3,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  walletText: {
-    color: "#d4e8ff",
-    marginTop: 8,
-    fontSize: 12,
-  },
-  metricsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  metricCard: {
-    width: "48.5%",
-    borderWidth: 1,
-    borderColor: "#2b5da8",
-    backgroundColor: "rgba(7, 24, 53, 0.88)",
-    borderRadius: 12,
-    padding: 12,
-    minHeight: 84,
-    justifyContent: "space-between",
-  },
-  metricLabel: {
-    color: "#9ecaf7",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.45,
-    textTransform: "uppercase",
-  },
-  metricValue: {
-    color: "#eef7ff",
-    fontSize: 19,
-    fontWeight: "900",
-  },
-  progressCard: {
-    borderWidth: 1,
-    borderColor: "#2f67b7",
-    backgroundColor: "rgba(8, 27, 60, 0.9)",
-    borderRadius: 14,
-    padding: 14,
-    gap: 10,
-  },
-  progressTitle: {
-    color: "#eff8ff",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  progressTrack: {
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: "#12386f",
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 999,
-    backgroundColor: "#66c1ff",
-  },
-  progressMeta: {
-    color: "#b6dbff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  timelineCard: {
-    borderWidth: 1,
-    borderColor: "#2f67b7",
-    backgroundColor: "rgba(8, 27, 60, 0.9)",
-    borderRadius: 14,
-    padding: 14,
-    gap: 10,
-  },
-  timelineTitle: {
-    color: "#ecf6ff",
-    fontSize: 17,
-    fontWeight: "900",
-  },
-  emptyText: {
-    color: "#b7dcff",
-    lineHeight: 20,
-  },
-  missionRow: {
-    flexDirection: "row",
-    gap: 10,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(113, 166, 227, 0.25)",
-  },
-  missionIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: "#11407f",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  missionIconText: {
-    fontSize: 19,
-  },
-  missionTextWrap: {
-    flex: 1,
-  },
-  missionTitle: {
-    color: "#eaf6ff",
-    fontWeight: "700",
-    fontSize: 13,
-  },
-  missionMeta: {
-    color: "#a8d1ff",
-    fontSize: 12,
-    marginTop: 3,
+    fontSize: 16,
   },
 });
+

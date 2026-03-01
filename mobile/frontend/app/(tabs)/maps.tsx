@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import {
   Animated,
   Modal,
@@ -11,8 +11,11 @@ import {
 } from "react-native";
 import MapView, { Marker, Polyline, type Region } from "react-native-maps";
 import { router } from "expo-router";
+import { getApiBaseUrl } from "@/constants/api";
+import { getStoredToken, getStoredUser } from "@/constants/session";
+import { useFocusEffect } from "@react-navigation/native";
 
-type NodeStatus = "online" | "locked";
+export type NodeStatus = "online" | "locked" | "completed";
 
 type CampusNode = {
   id: number;
@@ -25,7 +28,7 @@ type CampusNode = {
   description: string;
   challenge: string;
   xp: number;
-  coins: number;
+  sol: number;
   challengeId: string;
   status: NodeStatus;
   chainTo?: string;
@@ -45,7 +48,7 @@ const UTM_NODES: CampusNode[] = [
     challenge:
       "Find a carpool buddy today. (No text answer — submit/verify via QR check-in or manual review.)",
     xp: 50,
-    coins: 100,
+    sol: 0.005,
     challengeId: "GREEN_001",
     status: "online",
     chainTo: "CODING_001",
@@ -62,7 +65,7 @@ const UTM_NODES: CampusNode[] = [
     challenge:
       "Decrypt this simple cipher: A=B, B=C, C=D... What does 'ABC' become?",
     xp: 75,
-    coins: 150,
+    sol: 0.005,
     challengeId: "CODING_001",
     status: "online",
     chainTo: "PHOTO_001",
@@ -79,7 +82,7 @@ const UTM_NODES: CampusNode[] = [
     challenge:
       "Capture symmetry on campus. (No text answer — submit photo / pending review.)",
     xp: 40,
-    coins: 80,
+    sol: 0.005,
     challengeId: "PHOTO_001",
     status: "online",
     chainTo: "FIT_001",
@@ -95,25 +98,25 @@ const UTM_NODES: CampusNode[] = [
     description: "Test puzzle mission — quick validation check.",
     challenge: "Type the word 'Symmetry' as a test puzzle.",
     xp: 60,
-    coins: 120,
+    sol: 0.005,
     challengeId: "FIT_001",
     status: "online",
   },
   {
-  id: 5,
-  name: "Davis Building",
-  latitude: 43.55055,
-  longitude: -79.66225,
-  emoji: "🧠",
-  club: "Computer Science Student Community",
-  tag: "Technology",
-  description: "Rapid-fire quiz node. One question. One shot. Earn instant rewards.",
-  challenge: "Innovation Micro-Quest: answer the 1-question cipher quiz to claim the reward.",
-  xp: 60,
-  coins: 120,
-  challengeId: "CODING_002",
-  status: "online",
-},
+    id: 5,
+    name: "Davis Building",
+    latitude: 43.55055,
+    longitude: -79.66225,
+    emoji: "🧠",
+    club: "Computer Science Student Community",
+    tag: "Technology",
+    description: "Rapid-fire quiz node. One question. One shot. Earn instant rewards.",
+    challenge: "Innovation Micro-Quest: answer the 1-question cipher quiz to claim the reward.",
+    xp: 60,
+    sol: 0.005,
+    challengeId: "CODING_002",
+    status: "online",
+  },
 ];
 
 const MAP_STYLE = [
@@ -136,6 +139,7 @@ const TAG_COLORS: Record<string, string> = {
 const STATUS_COLORS: Record<NodeStatus, string> = {
   online: "#7fd0ff",
   locked: "#8fa7cc",
+  completed: "#64f593",
 };
 
 const INITIAL_REGION: Region = {
@@ -148,8 +152,30 @@ const INITIAL_REGION: Region = {
 export default function MapsScreen() {
   const mapRef = useRef<MapView>(null);
   const pulse = useRef(new Animated.Value(0)).current;
-  const [selectedNode, setSelectedNode] = useState<CampusNode | null>(UTM_NODES[0]);
+  const [selectedNode, setSelectedNode] = useState<CampusNode | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [completedIds, setCompletedIds] = useState<string[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchProgress = async () => {
+        const token = await getStoredToken();
+        const user = await getStoredUser();
+        if (!token || !user) return;
+
+        try {
+          const baseUrl = getApiBaseUrl();
+          const res = await fetch(`${baseUrl}/users/${user.id}/profile`);
+          if (res.ok) {
+            const data = await res.json();
+            const completeds = data.completedChallenges?.map((c: any) => c.challengeId) || [];
+            setCompletedIds(completeds);
+          }
+        } catch { }
+      };
+      void fetchProgress();
+    }, [])
+  );
 
   useEffect(() => {
     Animated.loop(
@@ -174,7 +200,32 @@ export default function MapsScreen() {
     []
   );
 
-  const onlineCount = UTM_NODES.filter((node) => node.status === "online").length;
+  const derivedNodes = useMemo(() => {
+    return UTM_NODES.map((node) => {
+      let status = node.status;
+      if (completedIds.includes(node.challengeId)) {
+        status = "completed";
+      } else {
+        // If it's chained from another node, check if that node is complete
+        const requiresNode = UTM_NODES.find((n) => n.chainTo === node.challengeId);
+        if (requiresNode && !completedIds.includes(requiresNode.challengeId)) {
+          status = "locked";
+        }
+      }
+      return { ...node, status };
+    });
+  }, [completedIds]);
+
+  // Set initial node if none selected
+  useEffect(() => {
+    if (!selectedNode && derivedNodes.length > 0) {
+      // Prioritize first incomplete node, else just first
+      const nextNode = derivedNodes.find(n => n.status !== "completed") || derivedNodes[0];
+      setSelectedNode(nextNode);
+    }
+  }, [derivedNodes, selectedNode]);
+
+  const onlineCount = derivedNodes.filter((node) => node.status !== "locked").length;
 
   const focusNode = (node: CampusNode, openPanel = true) => {
     setSelectedNode(node);
@@ -202,16 +253,25 @@ export default function MapsScreen() {
           lineDashPattern={[8, 6]}
         />
 
-        {UTM_NODES.map((node) => {
+        {derivedNodes.map((node) => {
           const isSelected = selectedNode?.id === node.id;
+          const isCompleted = node.status === "completed";
+          const isLocked = node.status === "locked";
           return (
             <Marker key={node.id} coordinate={{ latitude: node.latitude, longitude: node.longitude }}>
               <Pressable onPress={() => focusNode(node, true)} style={styles.markerWrapper}>
-                {isSelected ? (
+                {isSelected && !isCompleted ? (
                   <Animated.View style={[styles.markerPulse, { transform: [{ scale: pulseScale }] }]} />
                 ) : null}
-                <View style={[styles.markerCore, isSelected ? styles.markerCoreActive : null]}>
-                  <Text style={styles.markerEmoji}>{node.emoji}</Text>
+                <View style={[
+                  styles.markerCore,
+                  isSelected ? styles.markerCoreActive : null,
+                  isCompleted ? { borderColor: "#64f593", backgroundColor: "#0b311e" } : null,
+                  isLocked ? { borderColor: "#556b8a", backgroundColor: "#08152b", opacity: 0.6 } : null
+                ]}>
+                  <Text style={[styles.markerEmoji, isLocked && { opacity: 0.4 }]}>
+                    {isCompleted ? "✓" : node.emoji}
+                  </Text>
                 </View>
               </Pressable>
             </Marker>
@@ -233,15 +293,20 @@ export default function MapsScreen() {
         <View style={styles.hudBottom}>
           <Text style={styles.railTitle}>Mission Nodes</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
-            {UTM_NODES.map((node) => {
+            {derivedNodes.map((node) => {
               const active = node.id === selectedNode?.id;
+              const isLocked = node.status === "locked";
               return (
                 <Pressable
                   key={node.id}
-                  style={[styles.nodeChip, active ? styles.nodeChipActive : null]}
+                  style={[
+                    styles.nodeChip,
+                    active ? styles.nodeChipActive : null,
+                    isLocked ? { opacity: 0.5 } : null
+                  ]}
                   onPress={() => focusNode(node, true)}
                 >
-                  <Text style={styles.nodeChipEmoji}>{node.emoji}</Text>
+                  <Text style={styles.nodeChipEmoji}>{node.status === "completed" ? "✓" : node.emoji}</Text>
                   <View style={styles.nodeChipTextWrap}>
                     <Text style={styles.nodeChipName}>{node.name}</Text>
                     <Text style={styles.nodeChipMeta}>
@@ -267,9 +332,13 @@ export default function MapsScreen() {
             {selectedNode ? (
               <>
                 <View style={styles.modalRow}>
-                  <Text style={styles.modalEmoji}>{selectedNode.emoji}</Text>
+                  <Text style={styles.modalEmoji}>
+                    {selectedNode.status === "completed" ? "✓" : selectedNode.emoji}
+                  </Text>
                   <View style={styles.modalTitleWrap}>
-                    <Text style={styles.modalTitle}>{selectedNode.name}</Text>
+                    <Text style={[styles.modalTitle, selectedNode.status === "locked" && { color: "#8fa7cc" }]}>
+                      {selectedNode.status === "locked" ? "🔒 Locked Node" : selectedNode.name}
+                    </Text>
                     <Text style={styles.modalClub}>{selectedNode.club}</Text>
                   </View>
                   <View style={[styles.modalTag, { backgroundColor: TAG_COLORS[selectedNode.tag] ?? "#8cc0ff" }]}>
@@ -288,25 +357,38 @@ export default function MapsScreen() {
 
                 <View style={styles.rewardRow}>
                   <Text style={styles.rewardPill}>+{selectedNode.xp} XP</Text>
-                  <Text style={styles.rewardPill}>+{selectedNode.coins} Coins</Text>
+                  <Text style={styles.rewardPill}>+{selectedNode.sol} SOL</Text>
                   <Text style={styles.rewardPill}>{selectedNode.challengeId}</Text>
                 </View>
 
                 <View style={styles.modalActions}>
                   <Pressable
-                    style={[styles.actionButton, styles.actionPrimary]}
+                    style={[
+                      styles.actionButton,
+                      styles.actionPrimary,
+                      selectedNode.status === "completed" && { backgroundColor: "#0b311e", borderWidth: 1, borderColor: "#288048" },
+                      selectedNode.status === "locked" && { backgroundColor: "#1e2e4a", opacity: 0.7 }
+                    ]}
                     onPress={() => {
+                      if (selectedNode.status !== "online") return;
                       const challengeId = selectedNode.challengeId;
                       setDetailOpen(false);
                       router.push({ pathname: "/(tabs)/challenge", params: { challengeId } });
                     }}
                   >
-                    <Text style={styles.actionPrimaryText}>Launch Quest</Text>
+                    <Text style={[
+                      styles.actionPrimaryText,
+                      selectedNode.status === "completed" && { color: "#64f593" }
+                    ]}>
+                      {selectedNode.status === "completed" ? "Quest Completed" :
+                        selectedNode.status === "locked" ? "Requirement Not Met" : "Launch Quest"}
+                    </Text>
                   </Pressable>
 
                   <Pressable
-                    style={[styles.actionButton, styles.actionGhost]}
+                    style={[styles.actionButton, styles.actionGhost, selectedNode.status !== "online" && { opacity: 0.4 }]}
                     onPress={() => {
+                      if (selectedNode.status !== "online") return;
                       setDetailOpen(false);
                       router.push("/(tabs)/scan");
                     }}

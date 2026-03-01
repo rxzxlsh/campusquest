@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,8 @@ import {
   Alert,
   Pressable,
   ScrollView,
-  useWindowDimensions,
+  SafeAreaView,
+  Animated,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { getApiBaseUrl } from "@/constants/api";
@@ -17,6 +18,8 @@ import {
   getStoredWalletAddress,
   getWalletOwnerUserId,
 } from "@/constants/session";
+
+import GalaxyBackground from "@/components/GalaxyBackground";
 
 type Challenge = {
   id: string;
@@ -41,16 +44,18 @@ function shortWallet(addr: string) {
   return `${w.slice(0, 6)}...${w.slice(-4)}`;
 }
 
-// Deterministic pseudo-random 0..1 based on an integer seed
-function seeded01(seed: number) {
-  const x = Math.sin(seed * 9999) * 10000;
-  return x - Math.floor(x);
-}
-
 export default function ChallengeScreen() {
   const router = useRouter();
-  const { width, height } = useWindowDimensions();
 
+  // Intro fade animation
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  // Background floating animations
+  const floatAnim1 = useRef(new Animated.Value(0)).current;
+  const floatAnim2 = useRef(new Animated.Value(0)).current;
+
+  // Extracted route params
   const { challengeId, result, rewardLamports, rewardTxSignature } = useLocalSearchParams<{
     challengeId: string;
     result?: string;
@@ -64,7 +69,16 @@ export default function ChallengeScreen() {
   const [sessionLoading, setSessionLoading] = useState(true);
 
   const [userId, setUserId] = useState("");
+  const [username, setUsername] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
+
+  useEffect(() => {
+    // Staggered enter animation
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
+    ]).start();
+  }, [fadeAnim, slideAnim]);
 
   useEffect(() => {
     const loadSession = async () => {
@@ -85,6 +99,7 @@ export default function ChallengeScreen() {
       }
 
       setUserId(user.id);
+      setUsername(user.username || user.email?.split('@')[0] || "Pilot");
       setWalletAddress(wallet);
       setSessionLoading(false);
     };
@@ -119,14 +134,16 @@ export default function ChallengeScreen() {
     if (result === "win") {
       Alert.alert(
         "You won! 🎉",
-        `Reward: ${rewardLamports ?? "?"} lamports\nTx: ${
-          rewardTxSignature ? rewardTxSignature.slice(0, 18) + "..." : "n/a"
-        }`
+        `Reward: ${rewardLamports ? (Number(rewardLamports) / 1_000_000_000).toFixed(4) : "?"} SOL\nTx: ${rewardTxSignature ? rewardTxSignature.slice(0, 18) + "..." : "n/a"
+        }`,
+        [{ text: "Back to Map", onPress: () => router.replace("/(tabs)/maps") }]
       );
     } else if (result === "lose") {
       Alert.alert("Not yet", "Incorrect — try again.");
     } else if (result === "submitted") {
-      Alert.alert("Submitted", "Submission received.");
+      Alert.alert("Submitted", "Submission received.", [
+        { text: "Back to Map", onPress: () => router.replace("/(tabs)/maps") }
+      ]);
     } else if (result === "error") {
       Alert.alert("Error", "Something went wrong during submission.");
     }
@@ -160,317 +177,287 @@ export default function ChallengeScreen() {
     });
   };
 
-  // Star positions in pixels (no % strings)
-  const stars = useMemo(() => {
-    const count = 18;
-    const safeW = Math.max(1, width);
-    const safeH = Math.max(1, height);
-    return Array.from({ length: count }).map((_, i) => {
-      const x = seeded01(i + 1) * (safeW - 6);
-      const y = seeded01((i + 1) * 7) * (safeH - 6);
-      const size = 2 + ((i * 7) % 3);
-      const opacity = 0.35 + (((i * 11) % 40) / 100);
-      return { x, y, size, opacity };
-    });
-  }, [width, height]);
-
   return (
-    <View style={styles.screen}>
-      {/* starfield layer */}
-      <View pointerEvents="none" style={styles.starsLayer}>
-        {stars.map((s, i) => (
-          <View
-            key={i}
-            style={[
-              styles.star,
-              { left: s.x, top: s.y, width: s.size, height: s.size, opacity: s.opacity },
-            ]}
-          />
-        ))}
-      </View>
+    <SafeAreaView style={styles.screen}>
+      <GalaxyBackground />
 
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Challenge Lobby</Text>
-        <Text style={styles.subtitle}>Confirm your identity and launch the quest.</Text>
+      <ScrollView contentContainerStyle={styles.container} bounces={false} showsVerticalScrollIndicator={false}>
+        {/* ── Tucked Top Header ── */}
+        <Animated.View style={[styles.topHeader, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          <View style={styles.topHeaderLeft}>
+            <View style={styles.topAvatar}>
+              <Text style={styles.topAvatarEmoji}>👤</Text>
+            </View>
+            <View>
+              <Text style={styles.topUsername}>{username}</Text>
+              <Text style={styles.topRole}>Campus Runner</Text>
+            </View>
+          </View>
+          <View style={styles.walletBadge}>
+            <Text style={styles.walletBadgeText}>{shortWallet(walletAddress)}</Text>
+          </View>
+        </Animated.View>
 
         {loading || sessionLoading ? (
-          <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" />
-            <Text style={styles.loadingText}>{sessionLoading ? "Loading user session…" : "Loading challenge…"}</Text>
+          <View style={styles.glassCard}>
+            <ActivityIndicator size="large" color="#6eadff" />
+            <Text style={styles.loadingText}>{sessionLoading ? "Authenticating Session…" : "Syncing Mission…"}</Text>
           </View>
         ) : error ? (
-          <View style={styles.loadingCard}>
-            <Text style={styles.errorText}>Error: {error}</Text>
+          <View style={styles.glassCard}>
+            <Text style={styles.errorText}>Connection Error: {error}</Text>
           </View>
         ) : challenge ? (
-          <>
-            <View style={styles.progressCard}>
-              <Text style={styles.progressTitle}>{challenge.club}</Text>
-              <Text style={styles.progressMeta}>{prettyType(challenge.type)} • Innovation Quest</Text>
+          <Animated.View style={[styles.mainWrap, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+            <View style={styles.headerTitles}>
+              <Text style={styles.title}>Quest Order</Text>
+              <Text style={styles.subtitle}>Objective loaded. Awaiting launch confirmation.</Text>
+            </View>
 
-              <View style={styles.questBox}>
-                <Text style={styles.label}>Prompt</Text>
-                <Text style={styles.questText}>{challenge.description}</Text>
-              </View>
-
-              <View style={styles.metricsGrid}>
-                <View style={styles.metricCard}>
-                  <Text style={styles.metricLabel}>XP</Text>
-                  <Text style={styles.metricValue}>+{challenge.xp}</Text>
-                </View>
-                <View style={styles.metricCard}>
-                  <Text style={styles.metricLabel}>Reward</Text>
-                  <Text style={styles.metricValue}>{challenge.rewardLamports} lamport(s)</Text>
+            {/* ── Sleek Glassmorphic Hero Card ── */}
+            <View style={styles.glassCard}>
+              <View style={styles.cardHeaderRow}>
+                <View>
+                  <Text style={styles.clubTitle}>{challenge.club}</Text>
+                  <Text style={styles.clubMeta}>{prettyType(challenge.type)} • Node Task</Text>
                 </View>
               </View>
-            </View>
 
-            <View style={styles.identityCard}>
-              <View style={styles.aura} />
-              <View style={styles.orbitRing}>
-                <View style={styles.orbitDot} />
-              </View>
-              <View style={styles.avatarCore}>
-                <Text style={styles.avatarGlyph}>🧭</Text>
+              <View style={styles.promptBox}>
+                <Text style={styles.promptLabel}>{"// TRANSMISSION"}</Text>
+                <Text style={styles.promptText}>{challenge.description}</Text>
               </View>
 
-              <Text style={styles.userIdText}>{userId.trim() || "Player"}</Text>
-              <Text style={styles.roleText}>Campus Runner</Text>
-              <Text style={styles.walletText}>Wallet: {shortWallet(walletAddress)}</Text>
+              <View style={styles.metricsRow}>
+                <View style={styles.metricPill}>
+                  <Text style={styles.metricVal}>+{challenge.xp}</Text>
+                  <Text style={styles.metricSub}>XP YIELD</Text>
+                </View>
+                <View style={styles.metricDivider} />
+                <View style={styles.metricPill}>
+                  <Text style={styles.metricVal}>{(challenge.rewardLamports / 1_000_000_000).toFixed(4)}</Text>
+                  <Text style={styles.metricSub}>SOL REWARD</Text>
+                </View>
+              </View>
             </View>
 
-            <View style={styles.searchCard}>
-              <Text style={styles.label}>Authenticated UofT User</Text>
-              <Text style={styles.sessionValue}>{userId}</Text>
-              <Text style={styles.label}>Linked Phantom Wallet</Text>
-              <Text style={styles.sessionValue}>{shortWallet(walletAddress)}</Text>
-
-              <Pressable style={styles.refreshButton} onPress={startAndGoPlay}>
-                <Text style={styles.refreshButtonText}>Start Challenge</Text>
-              </Pressable>
-            </View>
-          </>
+            {/* ── Hero Launch Action ── */}
+            <Pressable
+              style={({ pressed }) => [styles.launchButton, pressed && styles.launchButtonPressed]}
+              onPress={startAndGoPlay}
+            >
+              <Text style={styles.launchButtonText}>LAUNCH QUEST</Text>
+              <Text style={styles.launchButtonIcon}>→</Text>
+            </Pressable>
+          </Animated.View>
         ) : null}
+        <View style={{ height: 60 }} />
       </ScrollView>
-    </View>
+    </SafeAreaView >
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#030d26",
-  },
-  starsLayer: {
-    position: "absolute",
-    inset: 0,
-  },
-  star: {
-    position: "absolute",
-    borderRadius: 999,
-    backgroundColor: "#cce7ff",
   },
   container: {
-    paddingHorizontal: 18,
-    paddingTop: 24,
-    paddingBottom: 36,
-    gap: 14,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 40,
     flexGrow: 1,
   },
-  title: {
-    color: "#e4f1ff",
-    fontSize: 30,
+  topHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 30,
+    backgroundColor: "rgba(10, 24, 56, 0.4)",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(91, 161, 237, 0.15)",
+  },
+  topHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  topAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: "rgba(22, 59, 133, 0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(99, 172, 255, 0.3)",
+  },
+  topAvatarEmoji: {
+    fontSize: 20,
+  },
+  topUsername: {
+    color: "#e8f3ff",
+    fontSize: 15,
     fontWeight: "900",
-    letterSpacing: 0.4,
+  },
+  topRole: {
+    color: "#6b9edc",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  walletBadge: {
+    backgroundColor: "rgba(8, 20, 48, 0.8)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(75, 127, 201, 0.3)",
+  },
+  walletBadgeText: {
+    color: "#8fc2ff",
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: "Courier",
+  },
+  mainWrap: {
+    flex: 1,
+  },
+  headerTitles: {
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  title: {
+    color: "#ffffff",
+    fontSize: 34,
+    fontWeight: "900",
+    letterSpacing: 0.5,
   },
   subtitle: {
-    color: "#8dc5ff",
+    color: "#7fafe3",
     fontSize: 14,
-    marginTop: -6,
-    marginBottom: 4,
+    marginTop: 2,
   },
-  searchCard: {
+  glassCard: {
     borderWidth: 1,
-    borderColor: "#1d4f94",
-    backgroundColor: "rgba(8, 29, 67, 0.88)",
-    borderRadius: 16,
-    padding: 14,
-    gap: 10,
+    borderColor: "rgba(84, 158, 245, 0.25)",
+    backgroundColor: "rgba(12, 29, 66, 0.55)",
+    borderRadius: 24,
+    padding: 22,
+    marginBottom: 24,
+    shadowColor: "#05163a",
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
   },
-  label: {
-    color: "#bfe0ff",
-    fontWeight: "700",
-    fontSize: 12,
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
+  cardHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 20,
   },
-  sessionValue: {
-    borderWidth: 1,
-    borderColor: "#326dc2",
-    borderRadius: 10,
-    backgroundColor: "rgba(3, 15, 42, 0.95)",
-    color: "#f1f7ff",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-  },
-  refreshButton: {
-    backgroundColor: "#0f56c6",
-    borderRadius: 10,
-    paddingVertical: 11,
-    alignItems: "center",
-    marginTop: 6,
-  },
-  refreshButtonText: {
-    color: "#ecf5ff",
+  clubTitle: {
+    color: "#e0f0ff",
+    fontSize: 20,
     fontWeight: "800",
-    letterSpacing: 0.4,
+    letterSpacing: -0.2,
   },
-  loadingCard: {
+  clubMeta: {
+    color: "#5f9bea",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  promptBox: {
+    backgroundColor: "rgba(3, 10, 26, 0.6)",
     borderWidth: 1,
-    borderColor: "#1d4f94",
-    backgroundColor: "rgba(6, 25, 58, 0.86)",
-    borderRadius: 14,
-    paddingVertical: 22,
+    borderColor: "rgba(66, 123, 209, 0.3)",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    minHeight: 120,
+  },
+  promptLabel: {
+    color: "#468de0",
+    fontSize: 11,
+    fontWeight: "900",
+    marginBottom: 8,
+    letterSpacing: 1.2,
+  },
+  promptText: {
+    color: "#c9e4ff",
+    fontSize: 15,
+    lineHeight: 24,
+    fontWeight: "500",
+  },
+  metricsRow: {
+    flexDirection: "row",
+    justifyContent: "space-evenly",
     alignItems: "center",
-    gap: 8,
+    backgroundColor: "rgba(4, 18, 50, 0.5)",
+    borderRadius: 16,
+    paddingVertical: 14,
+  },
+  metricPill: {
+    alignItems: "center",
+  },
+  metricVal: {
+    color: "#ffffff",
+    fontSize: 24,
+    fontWeight: "900",
+  },
+  metricSub: {
+    color: "#5fa4f5",
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 2,
+    letterSpacing: 1,
+  },
+  metricDivider: {
+    width: 1,
+    height: "80%",
+    backgroundColor: "rgba(75, 140, 224, 0.25)",
+  },
+  launchButton: {
+    backgroundColor: "#1650b0",
+    borderRadius: 20,
+    paddingVertical: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#2275f5",
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  launchButtonPressed: {
+    backgroundColor: "#0d357a",
+    opacity: 0.9,
+    shadowOpacity: 0.1,
+  },
+  launchButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: 1.5,
+  },
+  launchButtonIcon: {
+    color: "#ffffff",
+    fontSize: 18,
+    fontWeight: "900",
+    marginLeft: 8,
   },
   loadingText: {
-    color: "#c8e5ff",
+    marginTop: 12,
+    color: "#7fb4ed",
     fontWeight: "600",
   },
   errorText: {
-    color: "#ff9da8",
+    color: "#ff6f80",
     fontWeight: "700",
-  },
-  identityCard: {
-    borderWidth: 1,
-    borderColor: "#356dc3",
-    backgroundColor: "rgba(6, 24, 56, 0.9)",
-    borderRadius: 20,
-    paddingTop: 18,
-    paddingBottom: 16,
-    alignItems: "center",
-    overflow: "hidden",
-    gap: 4,
-  },
-  aura: {
-    position: "absolute",
-    top: 24,
-    width: 140,
-    height: 140,
-    borderRadius: 999,
-    backgroundColor: "#2a77ff",
-    opacity: 0.35,
-  },
-  orbitRing: {
-    position: "absolute",
-    top: 20,
-    width: 148,
-    height: 148,
-    borderRadius: 999,
-    borderWidth: 1.2,
-    borderColor: "rgba(136, 201, 255, 0.8)",
-    alignItems: "center",
-  },
-  orbitDot: {
-    position: "absolute",
-    top: -4,
-    width: 9,
-    height: 9,
-    borderRadius: 999,
-    backgroundColor: "#ebf6ff",
-  },
-  avatarCore: {
-    width: 104,
-    height: 104,
-    borderRadius: 999,
-    backgroundColor: "#f4fbff",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 4,
-    borderColor: "#6cb5ff",
-    marginBottom: 10,
-    marginTop: 10,
-  },
-  avatarGlyph: {
-    fontSize: 44,
-  },
-  userIdText: {
-    color: "#f0f7ff",
-    fontSize: 19,
-    fontWeight: "800",
-  },
-  roleText: {
-    color: "#95ceff",
-    fontSize: 13,
-    marginTop: 3,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  walletText: {
-    color: "#d4e8ff",
-    marginTop: 8,
-    fontSize: 12,
-  },
-  metricsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 10,
-  },
-  metricCard: {
-    width: "48.5%",
-    borderWidth: 1,
-    borderColor: "#2b5da8",
-    backgroundColor: "rgba(7, 24, 53, 0.88)",
-    borderRadius: 12,
-    padding: 12,
-    minHeight: 84,
-    justifyContent: "space-between",
-  },
-  metricLabel: {
-    color: "#9ecaf7",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.45,
-    textTransform: "uppercase",
-  },
-  metricValue: {
-    color: "#eef7ff",
-    fontSize: 19,
-    fontWeight: "900",
-  },
-  progressCard: {
-    borderWidth: 1,
-    borderColor: "#2f67b7",
-    backgroundColor: "rgba(8, 27, 60, 0.9)",
-    borderRadius: 14,
-    padding: 14,
-    gap: 10,
-  },
-  progressTitle: {
-    color: "#eff8ff",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  progressMeta: {
-    color: "#b6dbff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  questBox: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#2f67b5",
-    backgroundColor: "#0d2d61",
-    padding: 12,
-    gap: 8,
-    marginTop: 8,
-  },
-  questText: {
-    color: "#d2e8ff",
-    lineHeight: 19,
-    fontSize: 13,
+    textAlign: "center",
   },
 });

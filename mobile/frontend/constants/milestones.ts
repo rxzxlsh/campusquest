@@ -32,9 +32,9 @@ export const MILESTONES: Milestone[] = [
     character: "👻",
     title: "The Library Ghost",
     description: "Haunts the 4th floor of Hazel McCallion. Knows where every textbook is hidden.",
-    rewardHint: "Unlocks: Spectral Hood cosmetic",
+    rewardHint: "Unlocks: Spectral Hoodie cosmetic",
     color: "#c8b4ff",
-    unlockItem: "HAT_GHOST",
+    unlockItem: "HOODIE_GHOST",
   },
   {
     id: "MN_WARRIOR",

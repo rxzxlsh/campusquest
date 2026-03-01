@@ -46,17 +46,10 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="WardrobeScreen"
+        name="wardrobe"
         options={{
           title: 'Wardrobe',
           tabBarIcon: ({ color }) => <IconSymbol name="sparkles" color={color} size={24} />,
-        }}
-      />
-      <Tabs.Screen
-        name="PathScreen"
-        options={{
-          title: 'Badges',
-          tabBarIcon: ({ color }) => <IconSymbol name="trophy" color={color} size={24} />,
         }}
       />
       <Tabs.Screen

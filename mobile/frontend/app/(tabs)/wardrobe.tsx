@@ -1,6 +1,5 @@
-// screens/WardrobeScreen.tsx
-// Browse, purchase, and equip cosmetic items using campusCoins.
-// Shows live pixel avatar preview as items are tried on.
+// screens/wardrobe.tsx
+// Browse, purchase, and equip cosmetic items using Solana (lamports).
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -16,6 +15,7 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { getApiBaseUrl } from "@/constants/api";
 import AvatarRenderer from "@/components/AvatarRenderer";
+import GalaxyBackground from "@/components/GalaxyBackground";
 import {
   getStoredToken,
   getStoredUser,
@@ -29,7 +29,7 @@ type ShopItem = {
   name: string;
   description: string;
   layer: "hat" | "top" | "accessory" | "eyes" | "base";
-  cost: number;
+  cost: number; // cost in lamports now
   emoji: string;
   color: string;
   milestoneRequired: string | null;
@@ -37,7 +37,7 @@ type ShopItem = {
 };
 
 type UserProfile = {
-  campusCoins: number;
+  sol: number;
   equippedItems: string[];
   unlockedItems: string[];
   xp: number;
@@ -54,19 +54,19 @@ const LAYER_LABELS: Record<ShopItem["layer"], string> = {
   base: "Base",
 };
 
-// ─── Fallback static shop data (no backend needed for MVP) ───────────────────
+// ─── Fallback static shop data (prices scaled for SOL MVP) ─────────────
 const STATIC_SHOP: ShopItem[] = [
   { id: "HAT_DEFAULT", name: "Campus Cap", description: "Standard UTM cap.", layer: "hat", cost: 0, emoji: "🧢", color: "#7fd0ff", milestoneRequired: null, isDefault: true },
-  { id: "HAT_GHOST", name: "Spectral Hood", description: "Haunted headwear from the Library Ghost.", layer: "hat", cost: 80, emoji: "👻", color: "#c8b4ff", milestoneRequired: "LIBRARY_GHOST", isDefault: false },
-  { id: "HAT_PROF", name: "Professor Cap", description: "Bestowed only by Prof. Bailey Glazer.", layer: "hat", cost: 200, emoji: "🎓", color: "#ff9f7f", milestoneRequired: "PROF_BAILEY", isDefault: false },
-  { id: "HAT_CROWN", name: "Champion Crown", description: "Only for UTM Campus Champions.", layer: "hat", cost: 500, emoji: "👑", color: "#ffd700", milestoneRequired: "UTM_CHAMPION", isDefault: false },
+  { id: "HOODIE_GHOST", name: "Spectral Hoodie", description: "Haunted streetwear from the Library Ghost.", layer: "top", cost: 0.02, emoji: "👻", color: "#c8b4ff", milestoneRequired: "LIBRARY_GHOST", isDefault: false },
+  { id: "HAT_PROF", name: "Professor Cap", description: "Bestowed only by Prof. Bailey Glazer.", layer: "hat", cost: 0.05, emoji: "🎓", color: "#ff9f7f", milestoneRequired: "PROF_BAILEY", isDefault: false },
+  { id: "HAT_CROWN", name: "Champion Crown", description: "Only for UTM Campus Champions.", layer: "hat", cost: 0.10, emoji: "👑", color: "#ffd700", milestoneRequired: "UTM_CHAMPION", isDefault: false },
   { id: "TOP_DEFAULT", name: "UTM Tee", description: "A classic UTM t-shirt.", layer: "top", cost: 0, emoji: "👕", color: "#3c78d8", milestoneRequired: null, isDefault: true },
-  { id: "ARMOUR_MN", name: "MN Battle Armour", description: "Forged in the fires of MN coursework.", layer: "top", cost: 150, emoji: "🛡️", color: "#ffd27f", milestoneRequired: "MN_WARRIOR", isDefault: false },
-  { id: "HOODIE_CCT", name: "CCT Hacker Hoodie", description: "Worn by legends of the CCT building.", layer: "top", cost: 120, emoji: "🖤", color: "#74ffb0", milestoneRequired: "CCT_HACKER", isDefault: false },
-  { id: "TOP_SPORT", name: "Athletics Jersey", description: "Rep the UTM Varsity spirit.", layer: "top", cost: 60, emoji: "🏃", color: "#ff7f7f", milestoneRequired: null, isDefault: false },
-  { id: "ACC_BACKPACK", name: "Quest Backpack", description: "Carries your XP. Stylishly.", layer: "accessory", cost: 40, emoji: "🎒", color: "#a0c4ff", milestoneRequired: null, isDefault: false },
-  { id: "ACC_SCROLL", name: "Ancient Scroll", description: "A mysterious parchment.", layer: "accessory", cost: 90, emoji: "📜", color: "#ffe599", milestoneRequired: null, isDefault: false },
-  { id: "ACC_BADGE", name: "Innovation Badge", description: "Proof you shipped something.", layer: "accessory", cost: 30, emoji: "⚡", color: "#ffdf7f", milestoneRequired: null, isDefault: false },
+  { id: "ARMOUR_MN", name: "MN Battle Armour", description: "Forged in the fires of MN coursework.", layer: "top", cost: 0.04, emoji: "🛡️", color: "#ffd27f", milestoneRequired: "MN_WARRIOR", isDefault: false },
+  { id: "HOODIE_CCT", name: "CCT Hacker Hoodie", description: "Worn by legends of the CCT building.", layer: "top", cost: 0.03, emoji: "🖤", color: "#74ffb0", milestoneRequired: "CCT_HACKER", isDefault: false },
+  { id: "TOP_SPORT", name: "Athletics Jersey", description: "Rep the UTM Varsity spirit.", layer: "top", cost: 0.015, emoji: "🏃", color: "#ff7f7f", milestoneRequired: null, isDefault: false },
+  { id: "ACC_BACKPACK", name: "Quest Backpack", description: "Carries your XP. Stylishly.", layer: "accessory", cost: 0.01, emoji: "🎒", color: "#a0c4ff", milestoneRequired: null, isDefault: false },
+  { id: "ACC_SCROLL", name: "Ancient Scroll", description: "A mysterious parchment.", layer: "accessory", cost: 0.025, emoji: "📜", color: "#ffe599", milestoneRequired: null, isDefault: false },
+  { id: "ACC_BADGE", name: "Innovation Badge", description: "Proof you shipped something.", layer: "accessory", cost: 0.005, emoji: "⚡", color: "#ffdf7f", milestoneRequired: null, isDefault: false },
 ];
 
 // ─── Item Card ────────────────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ function ItemCard({
         <Text style={styles.itemLocked}>{item.milestoneRequired?.replace(/_/g, " ")}</Text>
       ) : (
         <Text style={[styles.itemCost, { color: item.cost === 0 ? "#74ffb0" : "#ffd700" }]}>
-          {item.cost === 0 ? "FREE" : `${item.cost} 🪙`}
+          {item.cost === 0 ? "FREE" : `${item.cost} SOL`}
         </Text>
       )}
 
@@ -151,9 +151,10 @@ function ItemCard({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function WardrobeScreen() {
   const [userId, setUserId] = useState("");
+  const [username, setUsername] = useState("");
   const [shopItems] = useState<ShopItem[]>(STATIC_SHOP);
   const [profile, setProfile] = useState<UserProfile>({
-    campusCoins: 0,
+    sol: 0,
     equippedItems: ["HAT_DEFAULT", "TOP_DEFAULT"],
     unlockedItems: ["HAT_DEFAULT", "TOP_DEFAULT"],
     xp: 0,
@@ -175,12 +176,14 @@ export default function WardrobeScreen() {
 
     const activeUserId = user.id;
     setUserId(activeUserId);
+    setUsername(user.username || user.email?.split('@')[0] || "");
+
     try {
       const res = await fetch(`${API_BASE_URL}/users/${activeUserId}/profile`);
       if (!res.ok) return;
       const data = await res.json();
       setProfile({
-        campusCoins: data.campusCoins ?? 200, // demo coins for testing
+        sol: data.totalRewardSol ?? 0.2000, // demo sol for testing if API lacks them
         equippedItems: data.equippedItems ?? ["HAT_DEFAULT", "TOP_DEFAULT"],
         unlockedItems: data.unlockedItems ?? ["HAT_DEFAULT", "TOP_DEFAULT"],
         xp: data.xp ?? (data.completedChallenges?.length ?? 0) * 125,
@@ -209,13 +212,13 @@ export default function WardrobeScreen() {
   };
 
   const handleBuy = async (item: ShopItem) => {
-    if (profile.campusCoins < item.cost) {
-      Alert.alert("Not enough coins", `You need ${item.cost} coins but have ${profile.campusCoins}.`);
+    if (profile.sol < item.cost) {
+      Alert.alert("Insufficient Solana", `You need ${item.cost} SOL but only have ${profile.sol.toFixed(4)}. Complete real-world quests to earn SOL!`);
       return;
     }
     Alert.alert(
-      "Purchase",
-      `Buy ${item.name} for ${item.cost} coins?`,
+      "Confirm Purchase",
+      `Are you sure you want to spend ${item.cost} SOL on ${item.name}?`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -232,14 +235,14 @@ export default function WardrobeScreen() {
               if (!res.ok) throw new Error("Purchase failed");
               setProfile((prev) => ({
                 ...prev,
-                campusCoins: prev.campusCoins - item.cost,
+                sol: prev.sol - item.cost,
                 unlockedItems: [...prev.unlockedItems, item.id],
               }));
             } catch {
               // Optimistic local update for demo
               setProfile((prev) => ({
                 ...prev,
-                campusCoins: prev.campusCoins - item.cost,
+                sol: prev.sol - item.cost,
                 unlockedItems: [...prev.unlockedItems, item.id],
               }));
             } finally {
@@ -256,12 +259,12 @@ export default function WardrobeScreen() {
     const newEquipped = isCurrentlyEquipped
       ? profile.equippedItems.filter((id) => id !== item.id)
       : [
-          ...profile.equippedItems.filter((id) => {
-            const existing = shopItems.find((s) => s.id === id);
-            return existing?.layer !== item.layer;
-          }),
-          item.id,
-        ];
+        ...profile.equippedItems.filter((id) => {
+          const existing = shopItems.find((s) => s.id === id);
+          return existing?.layer !== item.layer;
+        }),
+        item.id,
+      ];
 
     setProfile((prev) => ({ ...prev, equippedItems: newEquipped }));
     setPreviewItems(newEquipped);
@@ -282,11 +285,13 @@ export default function WardrobeScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
+      <GalaxyBackground />
+
       {/* ── Header ── */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Wardrobe</Text>
         <View style={styles.coinBadge}>
-          <Text style={styles.coinText}>🪙 {profile.campusCoins}</Text>
+          <Text style={styles.coinText}>⚡ {profile.sol.toFixed(4)} SOL</Text>
         </View>
       </View>
 
@@ -303,8 +308,8 @@ export default function WardrobeScreen() {
             {previewItems.length === 0
               ? "Nothing equipped"
               : previewItems
-                  .map((id) => shopItems.find((s) => s.id === id)?.name ?? id)
-                  .join(" · ")}
+                .map((id) => shopItems.find((s) => s.id === id)?.name ?? id)
+                .join(" · ")}
           </Text>
           <Pressable
             style={styles.saveButton}
@@ -315,7 +320,7 @@ export default function WardrobeScreen() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ equippedItems: previewItems }),
-              }).catch(() => {});
+              }).catch(() => { });
             }}
           >
             <Text style={styles.saveButtonText}>Save Look</Text>
@@ -346,7 +351,7 @@ export default function WardrobeScreen() {
             const isEquipped = profile.equippedItems.includes(item.id);
             const isPreviewing = previewItems.includes(item.id) && !isEquipped;
             const milestoneLocked = Boolean(item.milestoneRequired);
-            const canAfford = profile.campusCoins >= item.cost;
+            const canAfford = profile.sol >= item.cost;
 
             return (
               <ItemCard
@@ -385,8 +390,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 18,
     paddingVertical: 14,
+    backgroundColor: "rgba(10, 24, 56, 0.4)",
     borderBottomWidth: 1,
-    borderBottomColor: "#1e3f7a",
+    borderBottomColor: "rgba(91, 161, 237, 0.15)",
   },
   headerTitle: {
     color: "#e8f3ff",
@@ -414,21 +420,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 18,
     paddingVertical: 16,
-    backgroundColor: "rgba(4, 14, 40, 0.9)",
-    borderBottomWidth: 1,
-    borderBottomColor: "#1e3f7a",
+    backgroundColor: "transparent",
     gap: 20,
   },
   previewBg: {
-    backgroundColor: "#0a1e42",
-    borderRadius: 12,
+    backgroundColor: "rgba(12, 29, 66, 0.55)",
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#2a5ca8",
+    borderColor: "rgba(84, 158, 245, 0.4)",
     padding: 12,
     alignItems: "center",
     justifyContent: "flex-end",
     width: 136,
     height: 160,
+    shadowColor: "#05163a",
+    shadowOpacity: 0.6,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 6 },
   },
   previewFloor: {
     position: "absolute",
@@ -480,8 +488,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#2a4a7a",
-    backgroundColor: "transparent",
+    borderColor: "rgba(75, 140, 224, 0.25)",
+    backgroundColor: "rgba(12, 29, 66, 0.65)",
   },
   layerTabActive: {
     backgroundColor: "#0f3a7a",
@@ -512,18 +520,20 @@ const styles = StyleSheet.create({
   // Item card
   itemCard: {
     width: "47%",
-    backgroundColor: "rgba(6, 22, 56, 0.9)",
-    borderRadius: 14,
+    backgroundColor: "rgba(12, 29, 66, 0.55)",
+    borderRadius: 16,
     borderWidth: 1,
+    borderColor: "rgba(84, 158, 245, 0.25)",
     padding: 12,
     gap: 6,
     alignItems: "center",
   },
   itemCardEquipped: {
-    backgroundColor: "rgba(12, 40, 90, 0.95)",
+    backgroundColor: "rgba(22, 60, 133, 0.75)",
+    borderColor: "rgba(84, 158, 245, 0.65)",
   },
   itemCardPreviewing: {
-    backgroundColor: "rgba(8, 30, 70, 0.95)",
+    backgroundColor: "rgba(14, 40, 80, 0.8)",
   },
   itemCardLocked: {
     opacity: 0.5,

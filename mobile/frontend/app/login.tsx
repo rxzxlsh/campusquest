@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import { router } from "expo-router";
 import { getApiBaseUrl } from "@/constants/api";
+import GalaxyBackground from "@/components/GalaxyBackground";
 import {
   clearWalletSession,
   getStoredWalletAddress,
@@ -84,6 +85,8 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.container}>
+      <GalaxyBackground />
+
       <Text style={styles.title}>CampusQuest 🎓</Text>
       <Text style={styles.subtitle}>{isLogin ? "Welcome back!" : "Create your account"}</Text>
       <Text style={styles.uoftNote}>UofT Students Only (@utoronto.ca)</Text>
@@ -140,15 +143,46 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff", padding: 20 },
-  title: { fontSize: 36, fontWeight: "bold", marginBottom: 8 },
-  subtitle: { fontSize: 18, color: "#333", marginBottom: 4 },
-  uoftNote: { fontSize: 13, color: "#888", marginBottom: 30 },
-  form: { width: "100%" },
+  container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#020815", padding: 20 },
+  title: { fontSize: 36, fontWeight: "900", marginBottom: 8, color: "#ffffff", letterSpacing: 0.5 },
+  subtitle: { fontSize: 18, color: "#7fafe3", marginBottom: 4, fontWeight: "600" },
+  uoftNote: { fontSize: 13, color: "#5a88c0", marginBottom: 30, fontWeight: "700" },
+
+  form: {
+    width: "100%",
+    backgroundColor: "rgba(12, 29, 66, 0.65)",
+    borderWidth: 1,
+    borderColor: "rgba(84, 158, 245, 0.25)",
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: "#05163a",
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+  },
   inputGroup: { marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: "600", color: "#002A5C", marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: "#ddd", borderRadius: 10, padding: 14, fontSize: 16, backgroundColor: "#f9f9f9" },
-  button: { backgroundColor: "#002A5C", padding: 16, borderRadius: 10, alignItems: "center", marginTop: 10, marginBottom: 16 },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-  switchText: { color: "#002A5C", fontSize: 14, textAlign: "center" },
+  label: { fontSize: 12, fontWeight: "800", color: "#6b9edc", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 },
+  input: {
+    borderWidth: 1,
+    borderColor: "rgba(66, 123, 209, 0.3)",
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    backgroundColor: "rgba(3, 10, 26, 0.6)",
+    color: "#e8f3ff",
+  },
+  button: {
+    backgroundColor: "#1650b0",
+    padding: 18,
+    borderRadius: 16,
+    alignItems: "center",
+    marginTop: 14,
+    marginBottom: 16,
+    shadowColor: "#2275f5",
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  buttonText: { color: "#ffffff", fontSize: 16, fontWeight: "900", letterSpacing: 1 },
+  switchText: { color: "#9fc9f7", fontSize: 14, textAlign: "center", fontWeight: "600" },
 });
