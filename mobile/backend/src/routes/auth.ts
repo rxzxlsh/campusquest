@@ -20,7 +20,7 @@ router.post('/signup', async (req, res) => {
   const { email, password, username } = req.body;
 
   if (!isUofTEmail(email)) {
-    return res.status(403).json({ error: '🎓 UofT students only. Use @utoronto.ca or @mail.utoronto.ca' });
+    return res.status(403).json({ error: 'UofT students only! Please use a@utoronto.ca or @mail.utoronto.ca email' });
   }
 
   try {

@@ -38,41 +38,55 @@ export default function LoginScreen() {
     router.replace("/(tabs)");
   };
 
+  const isUofTEmail = (emailStr: string) => {
+    const e = emailStr.trim().toLowerCase();
+    return e.endsWith("@utoronto.ca") || e.endsWith("@mail.utoronto.ca");
+  };
+
+  const handleClear = () => {
+    setEmail("");
+    setPassword("");
+    setUsername("");
+  };
+
   const handleSubmit = async () => {
     if (!email || !password) return Alert.alert("Error", "Please fill in all fields");
     if (!isLogin && !username) return Alert.alert("Error", "Please enter a username");
 
+    if (!isLogin && !isUofTEmail(email)) {
+      return Alert.alert("Authorization Error", "UofT students only! Use a @utoronto.ca or @mail.utoronto.ca email.");
+    }
+
     setLoading(true);
     try {
       if (!isLogin) {
-        // SIGNUP then auto LOGIN
+        // SIGNUP
         const signupRes = await fetch(`${API_URL}/api/auth/signup`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, username }),
+          body: JSON.stringify({ email: email.trim().toLowerCase(), password, username }),
         });
         const signupData = await signupRes.json();
-        if (!signupRes.ok) return Alert.alert("Error", signupData.error);
+        if (!signupRes.ok) {
+          Alert.alert("Error", signupData.error);
+          return;
+        }
 
-        // auto login after signup
-        const loginRes = await fetch(`${API_URL}/api/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        });
-        const loginData = await loginRes.json();
-        if (!loginRes.ok) return Alert.alert("Error", loginData.error);
-
-        await saveAndRedirect(loginData.token, loginData.user);
+        Alert.alert("Success", "Account created successfully. Please login.");
+        setPassword("");
+        setIsLogin(true);
       } else {
         // LOGIN
         const res = await fetch(`${API_URL}/api/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
         });
         const data = await res.json();
-        if (!res.ok) return Alert.alert("Error", data.error);
+        if (!res.ok) {
+          Alert.alert("Error", data.error);
+          return;
+        }
 
         await saveAndRedirect(data.token, data.user);
       }
@@ -87,102 +101,85 @@ export default function LoginScreen() {
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.container}>
       <GalaxyBackground />
 
-      <Text style={styles.title}>CampusQuest 🎓</Text>
-      <Text style={styles.subtitle}>{isLogin ? "Welcome back!" : "Create your account"}</Text>
-      <Text style={styles.uoftNote}>UofT Students Only (@utoronto.ca)</Text>
+      <View style={styles.card}>
+        <Text style={styles.title}>CampusQuest 🎓</Text>
+        <Text style={styles.subtitle}>{isLogin ? "Welcome back!" : "Create an account."}</Text>
+        <Text style={styles.uoftNote}>UofT Students Only (@utoronto.ca)</Text>
 
-      <View style={styles.form}>
-        {!isLogin && (
+        <View style={styles.form}>
+          {!isLogin && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Username</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. johnsmith"
+                placeholderTextColor="#8db6eb"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+              />
+            </View>
+          )}
+
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Username</Text>
+            <Text style={styles.label}>UofT Email</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. johnsmith"
-              value={username}
-              onChangeText={setUsername}
+              placeholder="yourname@utoronto.ca"
+              placeholderTextColor="#8db6eb"
+              value={email}
+              onChangeText={setEmail}
               autoCapitalize="none"
+              keyboardType="email-address"
             />
           </View>
-        )}
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>UofT Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="yourname@utoronto.ca"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your password"
+              placeholderTextColor="#8db6eb"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+          </View>
+
+          <View style={styles.buttonsContainer}>
+            <TouchableOpacity style={styles.clearButton} onPress={handleClear} disabled={loading}>
+              <Text style={styles.clearButtonText}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
+              <Text style={styles.buttonText}>{loading ? "Wait..." : isLogin ? "Login" : "Sign Up"}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
+            <Text style={styles.switchText}>
+              {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Login"}
+            </Text>
+          </TouchableOpacity>
         </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-        </View>
-
-        <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
-          <Text style={styles.buttonText}>{loading ? "Loading..." : isLogin ? "Login" : "Sign Up"}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
-          <Text style={styles.switchText}>
-            {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Login"}
-          </Text>
-        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#020815", padding: 20 },
-  title: { fontSize: 36, fontWeight: "900", marginBottom: 8, color: "#ffffff", letterSpacing: 0.5 },
-  subtitle: { fontSize: 18, color: "#7fafe3", marginBottom: 4, fontWeight: "600" },
-  uoftNote: { fontSize: 13, color: "#5a88c0", marginBottom: 30, fontWeight: "700" },
-
-  form: {
-    width: "100%",
-    backgroundColor: "rgba(12, 29, 66, 0.65)",
-    borderWidth: 1,
-    borderColor: "rgba(84, 158, 245, 0.25)",
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: "#05163a",
-    shadowOpacity: 0.6,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-  },
+  container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "transparent", padding: 20 },
+  card: { backgroundColor: "rgba(11, 35, 79, 0.8)", borderWidth: 1, borderColor: "#2f67b0", borderRadius: 18, padding: 24, width: "100%", maxWidth: 400 },
+  title: { fontSize: 32, fontWeight: "900", color: "#eef7ff", marginBottom: 2, textAlign: "center" },
+  subtitle: { fontSize: 16, color: "#b7d9ff", marginBottom: 4, textAlign: "center" },
+  uoftNote: { fontSize: 13, color: "#90c7ff", marginBottom: 20, fontWeight: "600", textAlign: "center" },
+  form: { width: "100%" },
   inputGroup: { marginBottom: 16 },
-  label: { fontSize: 12, fontWeight: "800", color: "#6b9edc", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 },
-  input: {
-    borderWidth: 1,
-    borderColor: "rgba(66, 123, 209, 0.3)",
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    backgroundColor: "rgba(3, 10, 26, 0.6)",
-    color: "#e8f3ff",
-  },
-  button: {
-    backgroundColor: "#1650b0",
-    padding: 18,
-    borderRadius: 16,
-    alignItems: "center",
-    marginTop: 14,
-    marginBottom: 16,
-    shadowColor: "#2275f5",
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  buttonText: { color: "#ffffff", fontSize: 16, fontWeight: "900", letterSpacing: 1 },
-  switchText: { color: "#9fc9f7", fontSize: 14, textAlign: "center", fontWeight: "600" },
+  label: { fontSize: 14, fontWeight: "700", color: "#d7eaff", marginBottom: 6 },
+  input: { borderWidth: 1, borderColor: "#3a74bf", borderRadius: 10, padding: 14, fontSize: 16, backgroundColor: "#081a39", color: "#f1f8ff" },
+  buttonsContainer: { flexDirection: "row", justifyContent: "space-between", gap: 10, marginTop: 10, marginBottom: 16 },
+  button: { flex: 1, backgroundColor: "#2d83ef", padding: 14, borderRadius: 10, alignItems: "center" },
+  buttonText: { color: "#f4fbff", fontSize: 15, fontWeight: "900" },
+  clearButton: { flex: 1, backgroundColor: "#0b3267", borderWidth: 1, borderColor: "#6eaef1", padding: 14, borderRadius: 10, alignItems: "center" },
+  clearButtonText: { color: "#dff1ff", fontSize: 15, fontWeight: "700" },
+  switchText: { color: "#9fd0ff", fontSize: 14, textAlign: "center", textDecorationLine: "underline", fontWeight: "600" },
 });
