@@ -35,7 +35,7 @@ type CampusNode = {
 };
 
 const UTM_NODES: CampusNode[] = [
-  // 1) MCCS_001 — DeerHacks attendance (NOW at Deerfield Hall + FIRST)
+  // 1) MCCS_001
   {
     id: 1,
     name: "Deerfield Hall",
@@ -51,10 +51,10 @@ const UTM_NODES: CampusNode[] = [
     sol: 0.005,
     challengeId: "MCCS_001",
     status: "online",
-    chainTo: "GREEN_002",
+    chainTo: "CODING_003",
   },
 
-  // 2) CODING_003 — Merge Sort Fill-in (unchanged)
+  // 2) CODING_003
   {
     id: 2,
     name: "Maanjiwe Nendamowinan",
@@ -73,7 +73,7 @@ const UTM_NODES: CampusNode[] = [
     chainTo: "PHOTO_002",
   },
 
-  // 3) PHOTO_002 — Camera Club Quiz (unchanged)
+  // 3) PHOTO_002
   {
     id: 3,
     name: "Blackwood Gallery",
@@ -92,7 +92,7 @@ const UTM_NODES: CampusNode[] = [
     chainTo: "NATURE_001",
   },
 
-  // 4) NATURE_001 — Deer text input (unchanged chain: does NOT point to MCCS_001)
+  // 4) NATURE_001
   {
     id: 4,
     name: "UTM Nature Trail Entrance",
@@ -102,15 +102,16 @@ const UTM_NODES: CampusNode[] = [
     club: "UTM Nature Club",
     tag: "Sustainability",
     description: "Nature Knowledge — UTM wildlife trivia.",
-    challenge: "What animal is famously spotted around UofT Mississauga campus?",
+    challenge:
+      "What animal is famously spotted around UofT Mississauga campus?",
     xp: 50,
     sol: 0.005,
     challengeId: "NATURE_001",
     status: "online",
-    chainTo: "FIT_002",
+    chainTo: "GREEN_002",
   },
 
-  // 5) GREEN_002 — Sustainability Quiz (MOVED to Instructional Centre, where DeerHacks used to be)
+  // 5) GREEN_002
   {
     id: 5,
     name: "Instructional Centre",
@@ -119,17 +120,18 @@ const UTM_NODES: CampusNode[] = [
     emoji: "🌱",
     club: "Green Leading Club UTM",
     tag: "Sustainability",
-    description: "Carbon Footprint Quiz — quick sustainability decision-making.",
+    description:
+      "Carbon Footprint Quiz — quick sustainability decision-making.",
     challenge:
       "Which action reduces your carbon footprint the most on campus?\nA) Using reusable bottles\nB) Turning off lights\nC) Carpooling\nD) Printing double-sided",
     xp: 50,
     sol: 0.005,
     challengeId: "GREEN_002",
     status: "online",
-    chainTo: "CODING_003",
+    chainTo: "FIT_002",
   },
 
-  // 6) FIT_002 — Fitness quiz (unchanged)
+  // 6) FIT_002
   {
     id: 6,
     name: "RAWC",
@@ -148,7 +150,7 @@ const UTM_NODES: CampusNode[] = [
     chainTo: "HOSA_001",
   },
 
-  // 7) HOSA_001 — HOSA attendance (unchanged)
+  // 7) HOSA_001 (End of chain)
   {
     id: 7,
     name: "Davis Building",
@@ -157,7 +159,8 @@ const UTM_NODES: CampusNode[] = [
     emoji: "🩺",
     club: "UTM HOSA",
     tag: "Wellness",
-    description: "Attendance Quest — check in to a HOSA event to earn rewards.",
+    description:
+      "Attendance Quest — check in to a HOSA event to earn rewards.",
     challenge:
       "Attend a UTM HOSA event. (No text answer — submit via QR check-in or staff verification.)",
     xp: 75,
