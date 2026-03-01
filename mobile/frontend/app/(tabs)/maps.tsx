@@ -35,26 +35,26 @@ type CampusNode = {
 };
 
 const UTM_NODES: CampusNode[] = [
-  // 1) GREEN_002 — Sustainability Quiz
+  // 1) MCCS_001 — DeerHacks attendance (NOW at Deerfield Hall + FIRST)
   {
     id: 1,
     name: "Deerfield Hall",
-    latitude: 43.55040,
-    longitude: -79.66640,
-    emoji: "🌱",
-    club: "Green Leading Club UTM",
-    tag: "Sustainability",
-    description: "Carbon Footprint Quiz — quick sustainability decision-making.",
+    latitude: 43.5504,
+    longitude: -79.6664,
+    emoji: "🎟️",
+    club: "UTM MCCS",
+    tag: "Technology",
+    description: "Attendance Quest — check in to earn rewards.",
     challenge:
-      "Which action reduces your carbon footprint the most on campus?\nA) Using reusable bottles\nB) Turning off lights\nC) Carpooling\nD) Printing double-sided",
-    xp: 50,
+      "Attend DeerHacks. (No text answer — submit via QR check-in or staff verification.)",
+    xp: 75,
     sol: 0.005,
-    challengeId: "GREEN_002",
+    challengeId: "MCCS_001",
     status: "online",
-    chainTo: "CODING_003",
+    chainTo: "GREEN_002",
   },
 
-  // 2) CODING_003 — Merge Sort Fill-in 
+  // 2) CODING_003 — Merge Sort Fill-in (unchanged)
   {
     id: 2,
     name: "Maanjiwe Nendamowinan",
@@ -73,7 +73,7 @@ const UTM_NODES: CampusNode[] = [
     chainTo: "PHOTO_002",
   },
 
-  // 3) PHOTO_002 — Camera Club Quiz (Symmetry)
+  // 3) PHOTO_002 — Camera Club Quiz (unchanged)
   {
     id: 3,
     name: "Blackwood Gallery",
@@ -92,7 +92,7 @@ const UTM_NODES: CampusNode[] = [
     chainTo: "NATURE_001",
   },
 
-  // 4) NATURE_001 — Deer text input
+  // 4) NATURE_001 — Deer text input (unchanged chain: does NOT point to MCCS_001)
   {
     id: 4,
     name: "UTM Nature Trail Entrance",
@@ -107,29 +107,29 @@ const UTM_NODES: CampusNode[] = [
     sol: 0.005,
     challengeId: "NATURE_001",
     status: "online",
-    chainTo: "MCCS_001",
+    chainTo: "FIT_002",
   },
 
-  // 5) MCCS_001 — DeerHacks attendance
+  // 5) GREEN_002 — Sustainability Quiz (MOVED to Instructional Centre, where DeerHacks used to be)
   {
     id: 5,
     name: "Instructional Centre",
     latitude: 43.5516,
     longitude: -79.664,
-    emoji: "🎟️",
-    club: "UTM MCCS",
-    tag: "Technology",
-    description: "Attendance Quest — check in to earn rewards.",
+    emoji: "🌱",
+    club: "Green Leading Club UTM",
+    tag: "Sustainability",
+    description: "Carbon Footprint Quiz — quick sustainability decision-making.",
     challenge:
-      "Attend DeerHacks. (No text answer — submit via QR check-in or staff verification.)",
-    xp: 75,
+      "Which action reduces your carbon footprint the most on campus?\nA) Using reusable bottles\nB) Turning off lights\nC) Carpooling\nD) Printing double-sided",
+    xp: 50,
     sol: 0.005,
-    challengeId: "MCCS_001",
+    challengeId: "GREEN_002",
     status: "online",
-    chainTo: "FIT_002",
+    chainTo: "CODING_003",
   },
 
-  // 6) FIT_002 — Fitness quiz (150 mins)
+  // 6) FIT_002 — Fitness quiz (unchanged)
   {
     id: 6,
     name: "RAWC",
@@ -148,12 +148,12 @@ const UTM_NODES: CampusNode[] = [
     chainTo: "HOSA_001",
   },
 
-  // 7) HOSA_001 — HOSA attendance
+  // 7) HOSA_001 — HOSA attendance (unchanged)
   {
     id: 7,
     name: "Davis Building",
     latitude: 43.54908,
-    longitude: -79.66290,
+    longitude: -79.6629,
     emoji: "🩺",
     club: "UTM HOSA",
     tag: "Wellness",
