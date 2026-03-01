@@ -15,6 +15,7 @@ import { connectDB } from "./db";
 import userRoutes from "./routes/users";
 import authRoutes from "./routes/auth";
 import RewardProfile from "./models/RewardProfile";
+import User from "./models/User";
 
 dotenv.config({ override: true });
 
@@ -318,6 +319,12 @@ async function recordCompletion(
       },
       { new: true, upsert: true }
     ).lean();
+
+    const challenge = challenges[challengeId];
+    await User.findByIdAndUpdate(userId, {
+      $inc: { xp: challenge?.xp ?? 0 },
+      $addToSet: { completedChallenges: challengeId },
+    });
 
     return {
       userId: profile.userId,
