@@ -19,8 +19,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          href: null,
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <IconSymbol name="person.fill" color={color} size={24} />,
         }}
       />
       <Tabs.Screen
@@ -44,13 +44,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol name="qrcode.viewfinder" color={color} size={24} />,
         }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color }) => <IconSymbol name="person.fill" color={color} size={24} />,
-        }}
-      />
+
       <Tabs.Screen
         name="WardrobeScreen"
         options={{
@@ -72,7 +66,7 @@ export default function TabLayout() {
         }}
       />
 
-        <Tabs.Screen
+      <Tabs.Screen
         name="play"
         options={{
           href: null,

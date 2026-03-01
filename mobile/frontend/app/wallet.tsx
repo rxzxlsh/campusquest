@@ -95,7 +95,7 @@ export default function WalletOnboardingScreen() {
       }
 
       await setWalletSession(user, normalizedWallet);
-      router.replace("/(tabs)/profile");
+      router.replace("/(tabs)");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Wallet linking failed";
       Alert.alert("Wallet connection failed", message);
