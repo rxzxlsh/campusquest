@@ -15,6 +15,7 @@ import { connectDB } from "./db";
 import userRoutes from "./routes/users";
 import authRoutes from "./routes/auth";
 import RewardProfile from "./models/RewardProfile";
+import User from "./models/User";
 
 dotenv.config({ override: true });
 
@@ -67,7 +68,12 @@ type RewardProfileSnapshot = {
   completedChallenges: CompletionRecord[];
 };
 
-const defaultRewardLamports = Number(process.env.SOLANA_REWARD_LAMPORTS ?? 1);
+const FALLBACK_REWARD_LAMPORTS = 5_000_000; // 0.005 SOL (matches map UI reward copy)
+const parsedRewardLamports = Number(process.env.SOLANA_REWARD_LAMPORTS);
+const defaultRewardLamports =
+  Number.isFinite(parsedRewardLamports) && parsedRewardLamports > 0
+    ? Math.floor(parsedRewardLamports)
+    : FALLBACK_REWARD_LAMPORTS;
 const rpcUrl = process.env.SOLANA_RPC_URL ?? clusterApiUrl("devnet");
 const connection = new Connection(rpcUrl, "confirmed");
 const demoUserId = process.env.DEMO_USER_ID ?? "demo-user-001";
@@ -318,6 +324,12 @@ async function recordCompletion(
       },
       { new: true, upsert: true }
     ).lean();
+
+    const challenge = challenges[challengeId];
+    await User.findByIdAndUpdate(userId, {
+      $inc: { xp: challenge?.xp ?? 0 },
+      $addToSet: { completedChallenges: challengeId },
+    });
 
     return {
       userId: profile.userId,
