@@ -216,7 +216,7 @@ GREEN_001 (Sustainability) → CODING_001 (Tech) → PHOTO_001 (Creative)
 
 ## 👥 Team
 
-Built at DeerHacks 2025 — University of Toronto Mississauga.
+Built at DeerHacks 2026 — University of Toronto Mississauga.
 
 ---
 
