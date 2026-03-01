@@ -275,7 +275,7 @@ export default function WardrobeScreen() {
         <View style={styles.previewBg}>
           {/* Pixel grid floor */}
           <View style={styles.previewFloor} />
-          <AvatarRenderer equippedItems={previewItems} pixelSize={14} />
+          <AvatarRenderer equippedItems={previewItems} pixelSize={8} />
         </View>
         <View style={styles.previewInfo}>
           <Text style={styles.previewLabel}>Preview</Text>
