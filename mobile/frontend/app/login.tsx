@@ -16,6 +16,7 @@ export default function LoginScreen() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
 
   const saveAndRedirect = async (token: string, user: StoredUser) => {
@@ -44,10 +45,12 @@ export default function LoginScreen() {
   const handleClear = () => {
     setEmail("");
     setPassword("");
+    setUsername("");
   };
 
   const handleSubmit = async () => {
     if (!email || !password) return Alert.alert("Error", "Please fill in all fields");
+    if (!isLogin && !username) return Alert.alert("Error", "Please enter a username");
 
     if (!isLogin && !isUofTEmail(email)) {
       return Alert.alert("Authorization Error", "UofT students only! Use a @utoronto.ca or @mail.utoronto.ca email.");
@@ -60,7 +63,7 @@ export default function LoginScreen() {
         const signupRes = await fetch(`${API_URL}/api/auth/signup`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+          body: JSON.stringify({ email: email.trim().toLowerCase(), password, username }),
         });
         const signupData = await signupRes.json();
         if (!signupRes.ok) {
@@ -101,6 +104,20 @@ export default function LoginScreen() {
         <Text style={styles.uoftNote}>UofT Students Only (@utoronto.ca)</Text>
 
         <View style={styles.form}>
+          {!isLogin && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Username</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. johnsmith"
+                placeholderTextColor="#8db6eb"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+              />
+            </View>
+          )}
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>UofT Email</Text>
             <TextInput

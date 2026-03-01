@@ -17,10 +17,10 @@ const isUofTEmail = (email: string) => {
 const isMongoReady = () => mongoose.connection.readyState === 1;
 
 router.post('/signup', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, username } = req.body;
 
   if (!isUofTEmail(email)) {
-    return res.status(403).json({ error: '🎓 UofT students only. Use @utoronto.ca or @mail.utoronto.ca' });
+    return res.status(403).json({ error: 'UofT students only! Please use a@utoronto.ca or @mail.utoronto.ca email' });
   }
 
   try {
@@ -30,9 +30,9 @@ router.post('/signup', async (req, res) => {
       const existing = await User.findOne({ email });
       if (existing) return res.status(400).json({ error: 'Email already registered' });
 
-      const user = await User.create({ email, password: hashed });
+      const user = await User.create({ email, password: hashed, username });
       const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ token, user: { id: user._id, email: user.email } });
+      return res.json({ token, user: { id: user._id, email: user.email, username: user.username } });
     }
 
     if (memoryUsers.has(email)) {
@@ -40,9 +40,9 @@ router.post('/signup', async (req, res) => {
     }
 
     const id = `mem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    memoryUsers.set(email, { id, email, password: hashed });
+    memoryUsers.set(email, { id, email, username, password: hashed });
     const token = jwt.sign({ userId: id }, JWT_SECRET, { expiresIn: '7d' });
-    return res.json({ token, user: { id, email } });
+    return res.json({ token, user: { id, email, username } });
   } catch (err: any) {
     console.error('Signup error:', err.message);
     res.status(500).json({ error: err.message ?? 'Server error' });
@@ -61,7 +61,7 @@ router.post('/login', async (req, res) => {
       if (!match) return res.status(400).json({ error: 'Invalid email or password' });
 
       const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ token, user: { id: user._id, email: user.email } });
+      return res.json({ token, user: { id: user._id, email: user.email, username: user.username } });
     }
 
     const user = memoryUsers.get(email);
@@ -71,7 +71,7 @@ router.post('/login', async (req, res) => {
     if (!match) return res.status(400).json({ error: 'Invalid email or password' });
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
-    return res.json({ token, user: { id: user.id, email: user.email } });
+    return res.json({ token, user: { id: user.id, email: user.email, username: user.username } });
   } catch (err: any) {
     console.error('Login error:', err.message);
     res.status(500).json({ error: err.message ?? 'Server error' });
