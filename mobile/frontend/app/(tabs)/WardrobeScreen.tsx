@@ -16,6 +16,12 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { getApiBaseUrl } from "@/constants/api";
 import AvatarRenderer from "@/components/AvatarRenderer";
+import {
+  getStoredToken,
+  getStoredUser,
+  getStoredWalletAddress,
+  getWalletOwnerUserId,
+} from "@/constants/session";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type ShopItem = {
@@ -38,7 +44,6 @@ type UserProfile = {
 };
 
 const API_BASE_URL = getApiBaseUrl();
-const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEMO_USER_ID ?? "demo-user-001";
 
 const LAYER_ORDER: ShopItem["layer"][] = ["hat", "top", "accessory", "eyes", "base"];
 const LAYER_LABELS: Record<ShopItem["layer"], string> = {
@@ -145,6 +150,7 @@ function ItemCard({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function WardrobeScreen() {
+  const [userId, setUserId] = useState("");
   const [shopItems] = useState<ShopItem[]>(STATIC_SHOP);
   const [profile, setProfile] = useState<UserProfile>({
     campusCoins: 0,
@@ -157,8 +163,20 @@ export default function WardrobeScreen() {
   const [loading, setLoading] = useState(false);
 
   const loadProfile = useCallback(async () => {
+    const [token, user, walletAddress, walletOwnerUserId] = await Promise.all([
+      getStoredToken(),
+      getStoredUser(),
+      getStoredWalletAddress(),
+      getWalletOwnerUserId(),
+    ]);
+
+    if (!token || !user) return;
+    if (!walletAddress || walletOwnerUserId !== user.id) return;
+
+    const activeUserId = user.id;
+    setUserId(activeUserId);
     try {
-      const res = await fetch(`${API_BASE_URL}/users/${DEFAULT_USER_ID}/profile`);
+      const res = await fetch(`${API_BASE_URL}/users/${activeUserId}/profile`);
       if (!res.ok) return;
       const data = await res.json();
       setProfile({
@@ -205,7 +223,8 @@ export default function WardrobeScreen() {
           onPress: async () => {
             setLoading(true);
             try {
-              const res = await fetch(`${API_BASE_URL}/users/${DEFAULT_USER_ID}/purchase`, {
+              if (!userId) throw new Error("Missing user session");
+              const res = await fetch(`${API_BASE_URL}/users/${userId}/purchase`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ itemId: item.id }),
@@ -248,7 +267,8 @@ export default function WardrobeScreen() {
     setPreviewItems(newEquipped);
 
     try {
-      await fetch(`${API_BASE_URL}/users/${DEFAULT_USER_ID}/equip`, {
+      if (!userId) return;
+      await fetch(`${API_BASE_URL}/users/${userId}/equip`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ equippedItems: newEquipped }),
@@ -290,7 +310,8 @@ export default function WardrobeScreen() {
             style={styles.saveButton}
             onPress={() => {
               setProfile((prev) => ({ ...prev, equippedItems: previewItems }));
-              fetch(`${API_BASE_URL}/users/${DEFAULT_USER_ID}/equip`, {
+              if (!userId) return;
+              fetch(`${API_BASE_URL}/users/${userId}/equip`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ equippedItems: previewItems }),

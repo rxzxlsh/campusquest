@@ -5,13 +5,18 @@ import {
   ActivityIndicator,
   StyleSheet,
   Alert,
-  TextInput,
   Pressable,
   ScrollView,
   useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { getApiBaseUrl } from "@/constants/api";
+import {
+  getStoredToken,
+  getStoredUser,
+  getStoredWalletAddress,
+  getWalletOwnerUserId,
+} from "@/constants/session";
 
 type Challenge = {
   id: string;
@@ -23,8 +28,6 @@ type Challenge = {
 };
 
 const API_BASE_URL = getApiBaseUrl();
-const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEMO_USER_ID ?? "demo-user-001";
-const DEFAULT_WALLET = process.env.EXPO_PUBLIC_DEMO_USER_WALLET ?? "";
 
 function prettyType(type: string) {
   const t = (type ?? "").trim().toLowerCase();
@@ -58,9 +61,36 @@ export default function ChallengeScreen() {
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
 
-  const [userId, setUserId] = useState(DEFAULT_USER_ID);
-  const [walletAddress, setWalletAddress] = useState(DEFAULT_WALLET);
+  const [userId, setUserId] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
+
+  useEffect(() => {
+    const loadSession = async () => {
+      const [token, user, wallet, walletOwnerUserId] = await Promise.all([
+        getStoredToken(),
+        getStoredUser(),
+        getStoredWalletAddress(),
+        getWalletOwnerUserId(),
+      ]);
+
+      if (!token || !user) {
+        router.replace("/login");
+        return;
+      }
+      if (!wallet || walletOwnerUserId !== user.id) {
+        router.replace("/wallet");
+        return;
+      }
+
+      setUserId(user.id);
+      setWalletAddress(wallet);
+      setSessionLoading(false);
+    };
+
+    void loadSession();
+  }, [router]);
 
   useEffect(() => {
     if (!challengeId) return;
@@ -112,11 +142,11 @@ export default function ChallengeScreen() {
     if (!challenge) return;
 
     if (!userId.trim()) {
-      Alert.alert("Missing User ID", "Please enter a user ID.");
+      Alert.alert("Missing User ID", "Log in again to continue.");
       return;
     }
     if (!walletAddress.trim()) {
-      Alert.alert("Missing Wallet", "Please enter your Phantom wallet address.");
+      Alert.alert("Missing Wallet", "Link your Phantom wallet to continue.");
       return;
     }
 
@@ -163,10 +193,10 @@ export default function ChallengeScreen() {
         <Text style={styles.title}>Challenge Lobby</Text>
         <Text style={styles.subtitle}>Confirm your identity and launch the quest.</Text>
 
-        {loading ? (
+        {loading || sessionLoading ? (
           <View style={styles.loadingCard}>
             <ActivityIndicator size="large" />
-            <Text style={styles.loadingText}>Loading challenge…</Text>
+            <Text style={styles.loadingText}>{sessionLoading ? "Loading user session…" : "Loading challenge…"}</Text>
           </View>
         ) : error ? (
           <View style={styles.loadingCard}>
@@ -210,22 +240,10 @@ export default function ChallengeScreen() {
             </View>
 
             <View style={styles.searchCard}>
-              <Text style={styles.label}>User ID</Text>
-              <TextInput
-                value={userId}
-                onChangeText={setUserId}
-                style={styles.input}
-                autoCapitalize="none"
-              />
-
-              <Text style={styles.label}>Wallet Address</Text>
-              <TextInput
-                value={walletAddress}
-                onChangeText={setWalletAddress}
-                style={styles.input}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
+              <Text style={styles.label}>Authenticated UofT User</Text>
+              <Text style={styles.sessionValue}>{userId}</Text>
+              <Text style={styles.label}>Linked Phantom Wallet</Text>
+              <Text style={styles.sessionValue}>{shortWallet(walletAddress)}</Text>
 
               <Pressable style={styles.refreshButton} onPress={startAndGoPlay}>
                 <Text style={styles.refreshButtonText}>Start Challenge</Text>
@@ -286,7 +304,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     textTransform: "uppercase",
   },
-  input: {
+  sessionValue: {
     borderWidth: 1,
     borderColor: "#326dc2",
     borderRadius: 10,

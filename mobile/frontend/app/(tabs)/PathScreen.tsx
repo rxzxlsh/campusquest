@@ -18,6 +18,12 @@ import { router } from "expo-router";
 import { getApiBaseUrl } from "@/constants/api";
 import AvatarRenderer from "@/components/AvatarRenderer";
 import {
+  getStoredToken,
+  getStoredUser,
+  getStoredWalletAddress,
+  getWalletOwnerUserId,
+} from "@/constants/session";
+import {
   MILESTONES,
   getCurrentMilestone,
   getNextMilestone,
@@ -38,7 +44,6 @@ type ProfileResponse = {
 };
 
 const API_BASE_URL = getApiBaseUrl();
-const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEMO_USER_ID ?? "demo-user-001";
 
 // ─── Walking Animation ────────────────────────────────────────────────────────
 function useWalkAnimation() {
@@ -134,6 +139,7 @@ function MilestoneNode({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function PathScreen() {
+  const [userId, setUserId] = useState("");
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null);
@@ -141,8 +147,26 @@ export default function PathScreen() {
   const scrollRef = useRef<ScrollView>(null);
 
   const loadProfile = useCallback(async () => {
+    const [token, user, walletAddress, walletOwnerUserId] = await Promise.all([
+      getStoredToken(),
+      getStoredUser(),
+      getStoredWalletAddress(),
+      getWalletOwnerUserId(),
+    ]);
+
+    if (!token || !user) {
+      router.replace("/login");
+      return;
+    }
+    if (!walletAddress || walletOwnerUserId !== user.id) {
+      router.replace("/wallet");
+      return;
+    }
+
+    const activeUserId = user.id;
+    setUserId(activeUserId);
     try {
-      const res = await fetch(`${API_BASE_URL}/users/${DEFAULT_USER_ID}/profile`);
+      const res = await fetch(`${API_BASE_URL}/users/${activeUserId}/profile`);
       if (!res.ok) throw new Error("Profile not found");
       const data = (await res.json()) as ProfileResponse;
       setProfile(data);
@@ -174,7 +198,7 @@ export default function PathScreen() {
           <AvatarRenderer equippedItems={equippedItems} pixelSize={5} />
         </View>
         <View style={styles.hudCenter}>
-          <Text style={styles.hudName}>{DEFAULT_USER_ID}</Text>
+          <Text style={styles.hudName}>{userId || "Pilot"}</Text>
           <Text style={styles.hudRole}>{currentMilestone.title}</Text>
           <View style={styles.xpBarTrack}>
             <View style={[styles.xpBarFill, { width: `${Math.round(progress * 100)}%` as `${number}%`, backgroundColor: currentMilestone.color }]} />

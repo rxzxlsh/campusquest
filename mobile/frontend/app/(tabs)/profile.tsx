@@ -7,12 +7,18 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { getApiBaseUrl } from "@/constants/api";
+import {
+  clearAllSession,
+  getStoredToken,
+  getStoredUser,
+  getStoredWalletAddress,
+  getWalletOwnerUserId,
+} from "@/constants/session";
 
 type CompletionRecord = {
   challengeId: string;
@@ -33,7 +39,6 @@ type ProfileResponse = {
 };
 
 const API_BASE_URL = getApiBaseUrl();
-const DEFAULT_USER_ID = process.env.EXPO_PUBLIC_DEMO_USER_ID ?? "demo-user-001";
 
 const STAR_FIELD = Array.from({ length: 24 }, (_value, index) => ({
   id: `star-${index}`,
@@ -65,8 +70,9 @@ function challengeGlyph(challengeId: string) {
 }
 
 export default function ProfileScreen() {
-  const params = useLocalSearchParams<{ userId?: string }>();
-  const [userId, setUserId] = useState(params.userId ?? DEFAULT_USER_ID);
+  const [userId, setUserId] = useState("");
+  const [sessionWallet, setSessionWallet] = useState("");
+  const [sessionReady, setSessionReady] = useState(false);
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
@@ -120,13 +126,43 @@ export default function ProfileScreen() {
     ).start();
   }, [orbit, pulse, sparkle]);
 
+  const loadSession = useCallback(async () => {
+    const [token, user, walletAddress, walletOwnerUserId] = await Promise.all([
+      getStoredToken(),
+      getStoredUser(),
+      getStoredWalletAddress(),
+      getWalletOwnerUserId(),
+    ]);
+
+    if (!token || !user) {
+      router.replace("/login");
+      return null;
+    }
+
+    if (!walletAddress || walletOwnerUserId !== user.id) {
+      router.replace("/wallet");
+      return null;
+    }
+
+    setUserId(user.id);
+    setSessionWallet(walletAddress);
+    setSessionReady(true);
+    return { userId: user.id, walletAddress };
+  }, []);
+
+  const handleLogout = async () => {
+    await clearAllSession();
+    router.replace("/login");
+  };
+
   const loadProfile = useCallback(async () => {
-    if (!userId.trim()) return;
+    const session = await loadSession();
+    if (!session?.userId) return;
 
     setLoading(true);
     setErrorText(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId.trim()}/profile`);
+      const response = await fetch(`${API_BASE_URL}/users/${session.userId}/profile`);
       const payload = (await response.json()) as ProfileResponse;
       if (!response.ok) {
         throw new Error(payload.error ?? "Failed to load profile");
@@ -139,7 +175,7 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [loadSession]);
 
   useFocusEffect(
     useCallback(() => {
@@ -153,6 +189,7 @@ export default function ProfileScreen() {
   const levelProgress = Math.min(1, (totalCompleted % 3) / 3);
   const questsToNextTier = totalCompleted % 3 === 0 ? 3 : 3 - (totalCompleted % 3);
   const role = resolveRole(totalCompleted);
+  const effectiveWallet = profile?.walletAddress || sessionWallet;
 
   const rotation = orbit.interpolate({
     inputRange: [0, 1],
@@ -193,18 +230,18 @@ export default function ProfileScreen() {
         <Text style={styles.subtitle}>UTM Campus Quest Protocol</Text>
 
         <View style={styles.searchCard}>
-          <Text style={styles.label}>Pilot ID</Text>
-          <TextInput
-            value={userId}
-            onChangeText={setUserId}
-            style={styles.input}
-            placeholder="demo-user-001"
-            placeholderTextColor="#8fb8ff"
-            autoCapitalize="none"
-          />
-          <Pressable style={styles.refreshButton} onPress={loadProfile}>
-            <Text style={styles.refreshButtonText}>Sync Profile</Text>
-          </Pressable>
+          <Text style={styles.label}>Authenticated UofT Pilot</Text>
+          <Text style={styles.sessionValue}>{sessionReady ? userId : "Loading..."}</Text>
+          <Text style={styles.label}>Linked Phantom Wallet</Text>
+          <Text style={styles.sessionValue}>{shortenWallet(effectiveWallet)}</Text>
+          <View style={styles.buttonRow}>
+            <Pressable style={styles.refreshButton} onPress={loadProfile}>
+              <Text style={styles.refreshButtonText}>Sync Profile</Text>
+            </Pressable>
+            <Pressable style={styles.logoutButton} onPress={handleLogout}>
+              <Text style={styles.logoutButtonText}>Logout</Text>
+            </Pressable>
+          </View>
         </View>
 
         {loading ? (
@@ -231,7 +268,7 @@ export default function ProfileScreen() {
 
               <Text style={styles.userIdText}>{profile.userId}</Text>
               <Text style={styles.roleText}>{role}</Text>
-              <Text style={styles.walletText}>Wallet {shortenWallet(profile.walletAddress)}</Text>
+              <Text style={styles.walletText}>Wallet {shortenWallet(effectiveWallet)}</Text>
             </View>
 
             <View style={styles.metricsGrid}>
@@ -338,7 +375,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     textTransform: "uppercase",
   },
-  input: {
+  sessionValue: {
     borderWidth: 1,
     borderColor: "#326dc2",
     borderRadius: 10,
@@ -348,7 +385,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 15,
   },
+  buttonRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+  },
   refreshButton: {
+    flex: 1,
     backgroundColor: "#0f56c6",
     borderRadius: 10,
     paddingVertical: 11,
@@ -356,6 +399,20 @@ const styles = StyleSheet.create({
   },
   refreshButtonText: {
     color: "#ecf5ff",
+    fontWeight: "800",
+    letterSpacing: 0.4,
+  },
+  logoutButton: {
+    flex: 1,
+    backgroundColor: "rgba(220, 38, 38, 0.8)",
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.5)",
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: "center",
+  },
+  logoutButtonText: {
+    color: "#ffe4e6",
     fontWeight: "800",
     letterSpacing: 0.4,
   },
