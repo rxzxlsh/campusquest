@@ -35,86 +35,134 @@ type CampusNode = {
 };
 
 const UTM_NODES: CampusNode[] = [
+  // 1) GREEN_002 — Sustainability Quiz
   {
     id: 1,
+    name: "Deerfield Hall",
+    latitude: 43.55040,
+    longitude: -79.66640,
+    emoji: "🌱",
+    club: "Green Leading Club UTM",
+    tag: "Sustainability",
+    description: "Carbon Footprint Quiz — quick sustainability decision-making.",
+    challenge:
+      "Which action reduces your carbon footprint the most on campus?\nA) Using reusable bottles\nB) Turning off lights\nC) Carpooling\nD) Printing double-sided",
+    xp: 50,
+    sol: 0.005,
+    challengeId: "GREEN_002",
+    status: "online",
+    chainTo: "CODING_003",
+  },
+
+  // 2) CODING_003 — Merge Sort Fill-in 
+  {
+    id: 2,
     name: "Maanjiwe Nendamowinan",
     latitude: 43.55111,
     longitude: -79.66583,
-    emoji: "🌱",
-    club: "Green Leading Club UofT",
-    tag: "Sustainability",
-    description:
-      "Carpool Challenge — find a carpool buddy on campus and reduce your carbon footprint.",
-    challenge:
-      "Find a carpool buddy today. (No text answer — submit/verify via QR check-in or manual review.)",
-    xp: 50,
-    sol: 0.005,
-    challengeId: "GREEN_001",
-    status: "online",
-    chainTo: "CODING_001",
-  },
-  {
-    id: 2,
-    name: "Instructional Centre",
-    latitude: 43.5516,
-    longitude: -79.664,
     emoji: "💻",
     club: "Computer Science Student Community",
     tag: "Technology",
-    description: "Cipher mission — quick decryption under pressure.",
+    description: "Coding Puzzle — algorithm fundamentals (fill-in answer).",
     challenge:
-      "Decrypt this simple cipher: A=B, B=C, C=D... What does 'ABC' become?",
+      "Which sorting algorithm has average time complexity O(n log n) and uses divide-and-conquer?",
     xp: 75,
     sol: 0.005,
-    challengeId: "CODING_001",
+    challengeId: "CODING_003",
     status: "online",
-    chainTo: "PHOTO_001",
+    chainTo: "PHOTO_002",
   },
+
+  // 3) PHOTO_002 — Camera Club Quiz (Symmetry)
   {
     id: 3,
-    name: "CCIT Building",
-    latitude: 43.5484,
+    name: "Blackwood Gallery",
+    latitude: 43.5483,
     longitude: -79.6632,
-    emoji: "🎬",
+    emoji: "📷",
     club: "Hart House Camera Club",
     tag: "Creativity",
-    description: "Photo mission — capture symmetry on campus.",
+    description: "Photography Quiz — composition fundamentals.",
     challenge:
-      "Capture symmetry on campus. (No text answer — submit photo / pending review.)",
+      "What photography technique creates a mirror-like balance across a central axis?\nA) Exposure stacking\nB) Symmetry\nC) Panning\nD) Framing",
     xp: 40,
     sol: 0.005,
-    challengeId: "PHOTO_001",
+    challengeId: "PHOTO_002",
     status: "online",
-    chainTo: "FIT_001",
+    chainTo: "NATURE_001",
   },
+
+  // 4) NATURE_001 — Deer text input
   {
     id: 4,
+    name: "UTM Nature Trail Entrance",
+    latitude: 43.5489,
+    longitude: -79.6659,
+    emoji: "🦌",
+    club: "UTM Nature Club",
+    tag: "Sustainability",
+    description: "Nature Knowledge — UTM wildlife trivia.",
+    challenge: "What animal is famously spotted around UofT Mississauga campus?",
+    xp: 50,
+    sol: 0.005,
+    challengeId: "NATURE_001",
+    status: "online",
+    chainTo: "MCCS_001",
+  },
+
+  // 5) MCCS_001 — DeerHacks attendance
+  {
+    id: 5,
+    name: "Instructional Centre",
+    latitude: 43.5516,
+    longitude: -79.664,
+    emoji: "🎟️",
+    club: "UTM MCCS",
+    tag: "Technology",
+    description: "Attendance Quest — check in to earn rewards.",
+    challenge:
+      "Attend DeerHacks. (No text answer — submit via QR check-in or staff verification.)",
+    xp: 75,
+    sol: 0.005,
+    challengeId: "MCCS_001",
+    status: "online",
+    chainTo: "FIT_002",
+  },
+
+  // 6) FIT_002 — Fitness quiz (150 mins)
+  {
+    id: 6,
     name: "RAWC",
     latitude: 43.5479,
     longitude: -79.6609,
     emoji: "🏃",
     club: "Fitness for Noobs",
     tag: "Wellness",
-    description: "Test puzzle mission — quick validation check.",
-    challenge: "Type the word 'Symmetry' as a test puzzle.",
-    xp: 60,
+    description: "Fitness Quiz — quick health knowledge check.",
+    challenge:
+      "How many minutes of moderate exercise is recommended per week?\nA) 30\nB) 60\nC) 150\nD) 300",
+    xp: 50,
     sol: 0.005,
-    challengeId: "FIT_001",
+    challengeId: "FIT_002",
     status: "online",
+    chainTo: "HOSA_001",
   },
+
+  // 7) HOSA_001 — HOSA attendance
   {
-    id: 5,
+    id: 7,
     name: "Davis Building",
-    latitude: 43.55055,
-    longitude: -79.66225,
-    emoji: "🧠",
-    club: "Computer Science Student Community",
-    tag: "Technology",
-    description: "Rapid-fire quiz node. One question. One shot. Earn instant rewards.",
-    challenge: "Innovation Micro-Quest: answer the 1-question cipher quiz to claim the reward.",
-    xp: 60,
+    latitude: 43.54908,
+    longitude: -79.66290,
+    emoji: "🩺",
+    club: "UTM HOSA",
+    tag: "Wellness",
+    description: "Attendance Quest — check in to a HOSA event to earn rewards.",
+    challenge:
+      "Attend a UTM HOSA event. (No text answer — submit via QR check-in or staff verification.)",
+    xp: 75,
     sol: 0.005,
-    challengeId: "CODING_002",
+    challengeId: "HOSA_001",
     status: "online",
   },
 ];
@@ -168,10 +216,11 @@ export default function MapsScreen() {
           const res = await fetch(`${baseUrl}/users/${user.id}/profile`);
           if (res.ok) {
             const data = await res.json();
-            const completeds = data.completedChallenges?.map((c: any) => c.challengeId) || [];
+            const completeds =
+              data.completedChallenges?.map((c: any) => c.challengeId) || [];
             setCompletedIds(completeds);
           }
-        } catch { }
+        } catch {}
       };
       void fetchProgress();
     }, [])
@@ -220,7 +269,7 @@ export default function MapsScreen() {
   useEffect(() => {
     if (!selectedNode && derivedNodes.length > 0) {
       // Prioritize first incomplete node, else just first
-      const nextNode = derivedNodes.find(n => n.status !== "completed") || derivedNodes[0];
+      const nextNode = derivedNodes.find((n) => n.status !== "completed") || derivedNodes[0];
       setSelectedNode(nextNode);
     }
   }, [derivedNodes, selectedNode]);
@@ -245,7 +294,12 @@ export default function MapsScreen() {
 
   return (
     <View style={styles.screen}>
-      <MapView ref={mapRef} style={styles.map} initialRegion={INITIAL_REGION} customMapStyle={MAP_STYLE}>
+      <MapView
+        ref={mapRef}
+        style={styles.map}
+        initialRegion={INITIAL_REGION}
+        customMapStyle={MAP_STYLE}
+      >
         <Polyline
           coordinates={trailCoordinates}
           strokeColor="#57b7ff"
@@ -258,17 +312,32 @@ export default function MapsScreen() {
           const isCompleted = node.status === "completed";
           const isLocked = node.status === "locked";
           return (
-            <Marker key={node.id} coordinate={{ latitude: node.latitude, longitude: node.longitude }}>
+            <Marker
+              key={node.id}
+              coordinate={{ latitude: node.latitude, longitude: node.longitude }}
+            >
               <Pressable onPress={() => focusNode(node, true)} style={styles.markerWrapper}>
                 {isSelected && !isCompleted ? (
-                  <Animated.View style={[styles.markerPulse, { transform: [{ scale: pulseScale }] }]} />
+                  <Animated.View
+                    style={[styles.markerPulse, { transform: [{ scale: pulseScale }] }]}
+                  />
                 ) : null}
-                <View style={[
-                  styles.markerCore,
-                  isSelected ? styles.markerCoreActive : null,
-                  isCompleted ? { borderColor: "#64f593", backgroundColor: "#0b311e" } : null,
-                  isLocked ? { borderColor: "#556b8a", backgroundColor: "#08152b", opacity: 0.6 } : null
-                ]}>
+                <View
+                  style={[
+                    styles.markerCore,
+                    isSelected ? styles.markerCoreActive : null,
+                    isCompleted
+                      ? { borderColor: "#64f593", backgroundColor: "#0b311e" }
+                      : null,
+                    isLocked
+                      ? {
+                          borderColor: "#556b8a",
+                          backgroundColor: "#08152b",
+                          opacity: 0.6,
+                        }
+                      : null,
+                  ]}
+                >
                   <Text style={[styles.markerEmoji, isLocked && { opacity: 0.4 }]}>
                     {isCompleted ? "✓" : node.emoji}
                   </Text>
@@ -292,7 +361,11 @@ export default function MapsScreen() {
 
         <View style={styles.hudBottom}>
           <Text style={styles.railTitle}>Mission Nodes</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.rail}
+          >
             {derivedNodes.map((node) => {
               const active = node.id === selectedNode?.id;
               const isLocked = node.status === "locked";
@@ -302,18 +375,25 @@ export default function MapsScreen() {
                   style={[
                     styles.nodeChip,
                     active ? styles.nodeChipActive : null,
-                    isLocked ? { opacity: 0.5 } : null
+                    isLocked ? { opacity: 0.5 } : null,
                   ]}
                   onPress={() => focusNode(node, true)}
                 >
-                  <Text style={styles.nodeChipEmoji}>{node.status === "completed" ? "✓" : node.emoji}</Text>
+                  <Text style={styles.nodeChipEmoji}>
+                    {node.status === "completed" ? "✓" : node.emoji}
+                  </Text>
                   <View style={styles.nodeChipTextWrap}>
                     <Text style={styles.nodeChipName}>{node.name}</Text>
                     <Text style={styles.nodeChipMeta}>
                       {node.tag} | +{node.xp} XP
                     </Text>
                   </View>
-                  <View style={[styles.nodeStatus, { backgroundColor: STATUS_COLORS[node.status] }]} />
+                  <View
+                    style={[
+                      styles.nodeStatus,
+                      { backgroundColor: STATUS_COLORS[node.status] },
+                    ]}
+                  />
                 </Pressable>
               );
             })}
@@ -336,12 +416,22 @@ export default function MapsScreen() {
                     {selectedNode.status === "completed" ? "✓" : selectedNode.emoji}
                   </Text>
                   <View style={styles.modalTitleWrap}>
-                    <Text style={[styles.modalTitle, selectedNode.status === "locked" && { color: "#8fa7cc" }]}>
+                    <Text
+                      style={[
+                        styles.modalTitle,
+                        selectedNode.status === "locked" && { color: "#8fa7cc" },
+                      ]}
+                    >
                       {selectedNode.status === "locked" ? "🔒 Locked Node" : selectedNode.name}
                     </Text>
                     <Text style={styles.modalClub}>{selectedNode.club}</Text>
                   </View>
-                  <View style={[styles.modalTag, { backgroundColor: TAG_COLORS[selectedNode.tag] ?? "#8cc0ff" }]}>
+                  <View
+                    style={[
+                      styles.modalTag,
+                      { backgroundColor: TAG_COLORS[selectedNode.tag] ?? "#8cc0ff" },
+                    ]}
+                  >
                     <Text style={styles.modalTagText}>{selectedNode.tag}</Text>
                   </View>
                 </View>
@@ -351,7 +441,8 @@ export default function MapsScreen() {
                   <Text style={styles.questTitle}>Active Innovation Quest</Text>
                   <Text style={styles.questText}>{selectedNode.challenge}</Text>
                   <Text style={styles.questChain}>
-                    Chain Link: {selectedNode.chainTo ? `Unlocks ${selectedNode.chainTo}` : "Terminal Node"}
+                    Chain Link:{" "}
+                    {selectedNode.chainTo ? `Unlocks ${selectedNode.chainTo}` : "Terminal Node"}
                   </Text>
                 </View>
 
@@ -366,8 +457,15 @@ export default function MapsScreen() {
                     style={[
                       styles.actionButton,
                       styles.actionPrimary,
-                      selectedNode.status === "completed" && { backgroundColor: "#0b311e", borderWidth: 1, borderColor: "#288048" },
-                      selectedNode.status === "locked" && { backgroundColor: "#1e2e4a", opacity: 0.7 }
+                      selectedNode.status === "completed" && {
+                        backgroundColor: "#0b311e",
+                        borderWidth: 1,
+                        borderColor: "#288048",
+                      },
+                      selectedNode.status === "locked" && {
+                        backgroundColor: "#1e2e4a",
+                        opacity: 0.7,
+                      },
                     ]}
                     onPress={() => {
                       if (selectedNode.status !== "online") return;
@@ -376,17 +474,26 @@ export default function MapsScreen() {
                       router.push({ pathname: "/(tabs)/challenge", params: { challengeId } });
                     }}
                   >
-                    <Text style={[
-                      styles.actionPrimaryText,
-                      selectedNode.status === "completed" && { color: "#64f593" }
-                    ]}>
-                      {selectedNode.status === "completed" ? "Quest Completed" :
-                        selectedNode.status === "locked" ? "Requirement Not Met" : "Launch Quest"}
+                    <Text
+                      style={[
+                        styles.actionPrimaryText,
+                        selectedNode.status === "completed" && { color: "#64f593" },
+                      ]}
+                    >
+                      {selectedNode.status === "completed"
+                        ? "Quest Completed"
+                        : selectedNode.status === "locked"
+                        ? "Requirement Not Met"
+                        : "Launch Quest"}
                     </Text>
                   </Pressable>
 
                   <Pressable
-                    style={[styles.actionButton, styles.actionGhost, selectedNode.status !== "online" && { opacity: 0.4 }]}
+                    style={[
+                      styles.actionButton,
+                      styles.actionGhost,
+                      selectedNode.status !== "online" && { opacity: 0.4 },
+                    ]}
                     onPress={() => {
                       if (selectedNode.status !== "online") return;
                       setDetailOpen(false);

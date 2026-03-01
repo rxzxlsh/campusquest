@@ -79,59 +79,98 @@ const memoryProfiles = new Map<string, RewardProfileSnapshot>();
  * Challenge Store
  * (questions + solutions)
  * -------------------------
+ *
+ * NOTE:
+ * - Challenges with a `solution` require a correct answer.
+ * - Challenges without a `solution` auto-pass on submit (good for attendance / photo missions).
+ * - `/challenges/:id` will not leak `solution`.
  */
 const challenges: { [key: string]: Challenge } = {
-  GREEN_001: {
-    id: "GREEN_001",
-    club: "Green Leading Club UofT",
-    type: "sustainability",
-    description:
-      "Carpool Challenge - Find a carpool buddy on campus and reduce your carbon footprint!",
+  // Green Leading Club UTM — Quiz
+  GREEN_002: {
+    id: "GREEN_002",
+    club: "Green Leading Club UTM",
+    type: "quiz",
+    description: "Which action reduces your carbon footprint the most on campus?",
+    options: [
+      "A) Using reusable bottles",
+      "B) Turning off lights",
+      "C) Carpooling",
+      "D) Printing double-sided",
+    ],
+    solution: "C) Carpooling",
     xp: 50,
     rewardLamports: defaultRewardLamports,
   },
 
-  // ✅ Text puzzle
-  CODING_001: {
-    id: "CODING_001",
+  // Fitness for Noobs — Quiz
+  FIT_002: {
+    id: "FIT_002",
+    club: "Fitness for Noobs",
+    type: "quiz",
+    description: "How many minutes of moderate exercise is recommended per week?",
+    options: ["A) 30", "B) 60", "C) 150", "D) 300"],
+    solution: "C) 150",
+    xp: 50,
+    rewardLamports: defaultRewardLamports,
+  },
+
+  // Computer Science Student Community (Coding Club) — Fill in the blank / text input
+  CODING_003: {
+    id: "CODING_003",
     club: "Computer Science Student Community",
     type: "puzzle",
     description:
-      "Decrypt this simple cipher: A=B, B=C, C=D... What does 'ABC' become?",
+      "Which sorting algorithm has average time complexity O(n log n) and uses divide-and-conquer? (fill in the blank)",
+    solution: "merge sort",
     xp: 75,
     rewardLamports: defaultRewardLamports,
-    solution: "BCD",
   },
 
-  // ✅ NEW: 1-question multiple choice quiz
-  CODING_002: {
-    id: "CODING_002",
-    club: "Computer Science Student Community",
-    type: "quiz",
-    description: "Which option matches the cipher result for 'ABC' (A=B, B=C, C=D...)?",
-    options: ["ABC", "BCD", "CDE", "DEF"],
-    xp: 60,
-    rewardLamports: defaultRewardLamports,
-    solution: "BCD",
-  },
-
-  PHOTO_001: {
-    id: "PHOTO_001",
+  // Hart House Camera Club — Quiz
+  PHOTO_002: {
+    id: "PHOTO_002",
     club: "Hart House Camera Club",
-    type: "photo",
-    description: "Capture symmetry on campus",
+    type: "quiz",
+    description:
+      "What photography technique creates a mirror-like balance across a central axis?",
+    options: ["A) Exposure stacking", "B) Symmetry", "C) Panning", "D) Framing"],
+    solution: "B) Symmetry",
     xp: 40,
     rewardLamports: defaultRewardLamports,
   },
 
-  FIT_001: {
-    id: "FIT_001",
-    club: "Fitness for Noobs",
+  // UTM Nature Club — Text input
+  NATURE_001: {
+    id: "NATURE_001",
+    club: "UTM Nature Club",
     type: "puzzle",
-    description: "Type the word 'Symmetry' as a test puzzle",
-    xp: 60,
+    description: "What animal is famously spotted around UofT Mississauga campus?",
+    solution: "deer",
+    xp: 50,
     rewardLamports: defaultRewardLamports,
-    solution: "Symmetry",
+  },
+
+  // UTM MCCS — Attendance event (auto-pass)
+  MCCS_001: {
+    id: "MCCS_001",
+    club: "UTM MCCS",
+    type: "attendance",
+    description: "Attend Deerhacks",
+    xp: 75,
+    rewardLamports: defaultRewardLamports,
+    // no solution => auto-pass
+  },
+
+  // UTM HOSA — Attendance event (auto-pass)
+  HOSA_001: {
+    id: "HOSA_001",
+    club: "UTM HOSA",
+    type: "attendance",
+    description: "Attend a UTM HOSA event",
+    xp: 75,
+    rewardLamports: defaultRewardLamports,
+    // no solution => auto-pass
   },
 };
 
@@ -493,7 +532,12 @@ app.post("/challenges/:id/submit", async (req, res) => {
       completedAt: new Date().toISOString(),
     };
 
-    const profile = await recordCompletion(userId, walletAddress, challengeId, completion);
+    const profile = await recordCompletion(
+      userId,
+      walletAddress,
+      challengeId,
+      completion
+    );
 
     userProgress[userId][challengeId] = "completed";
 
@@ -512,7 +556,8 @@ app.post("/challenges/:id/submit", async (req, res) => {
       totalRewardSol: toSol(profile.totalRewardLamports),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Reward transfer failed";
+    const message =
+      error instanceof Error ? error.message : "Reward transfer failed";
     return res.status(500).json({ error: message });
   }
 });
@@ -585,11 +630,16 @@ app.post("/challenges/:id/complete", async (req, res) => {
   }
 
   if (existingProfile?.completedChallengeIds?.includes(challengeId)) {
-    return res.status(409).json({ error: "Challenge already completed for this user." });
+    return res
+      .status(409)
+      .json({ error: "Challenge already completed for this user." });
   }
 
   try {
-    const rewardLamports = await resolvePayoutLamports(walletAddress, challenge.rewardLamports);
+    const rewardLamports = await resolvePayoutLamports(
+      walletAddress,
+      challenge.rewardLamports
+    );
     const rewardTxSignature = await sendLamports(walletAddress, rewardLamports);
 
     const completion: CompletionRecord = {
@@ -601,7 +651,12 @@ app.post("/challenges/:id/complete", async (req, res) => {
       completedAt: new Date().toISOString(),
     };
 
-    const profile = await recordCompletion(userId, walletAddress, challengeId, completion);
+    const profile = await recordCompletion(
+      userId,
+      walletAddress,
+      challengeId,
+      completion
+    );
 
     return res.json({
       success: true,
@@ -616,7 +671,8 @@ app.post("/challenges/:id/complete", async (req, res) => {
       totalRewardSol: toSol(profile.totalRewardLamports),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Reward transfer failed";
+    const message =
+      error instanceof Error ? error.message : "Reward transfer failed";
     return res.status(500).json({ error: message });
   }
 });
