@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, RefreshControl, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { getApiBaseUrl } from '@/constants/api';
 import { getStoredToken, getStoredUser } from '@/constants/session';
 import GalaxyBackground from '@/components/GalaxyBackground';
@@ -17,7 +16,6 @@ type LeaderboardUser = { // user schema
 };
 
 export default function LeaderboardScreen() {
-    const router = useRouter();
     const [users, setUsers] = useState<LeaderboardUser[]>([]);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -35,22 +33,14 @@ export default function LeaderboardScreen() {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
-            const data = await response.json().catch(() => null);
-            if (!response.ok) {
-                const msg = (data?.error || data?.message) ?? 'Failed to fetch leaderboard';
-                throw new Error(typeof msg === 'string' ? msg : 'Failed to fetch leaderboard');
-            }
-            if (Array.isArray(data)) {
-                setUsers(data);
-                setError(null);
-            } else {
-                setUsers([]);
-                setError('Invalid leaderboard response');
-            }
+            if (!response.ok) throw new Error('Failed to fetch leaderboard');
+
+            const data = await response.json();
+            setUsers(data);
+            setError(null);
         } catch (err: any) {
             console.error(err);
-            const message = err.message || (err?.name === 'TypeError' && err?.message?.includes('fetch') ? 'Could not reach server' : 'An error occurred');
-            setError(message);
+            setError(err.message || 'An error occurred');
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -75,33 +65,18 @@ export default function LeaderboardScreen() {
         }
     };
 
-    const openProfile = (user: LeaderboardUser) => {
-        router.push({
-            pathname: `/user/${user.id}`,
-            params: {
-                username: user.username,
-                xp: String(user.xp),
-                challengesCompleted: String(user.challengesCompleted),
-            },
-        });
-    };
-
     const renderItem = ({ item, index }: { item: LeaderboardUser; index: number }) => {
         const isCurrentUser = item.id === currentUserId;
 
         return (
-            <TouchableOpacity
-                style={[styles.userCard, isCurrentUser && styles.currentUserCard]}
-                onPress={() => openProfile(item)}
-                activeOpacity={0.8}
-            >
+            <View style={[styles.userCard, isCurrentUser && styles.currentUserCard]}>
                 <View style={styles.rankContainer}>
                     {renderRankBadge(index)}
                 </View>
 
                 <View style={styles.userInfo}>
                     <Text style={[styles.username, isCurrentUser && styles.currentUsername]} numberOfLines={1}>
-                        {item.username} {isCurrentUser && '(You)'}
+                        {item.username} {isCurrentUser && '(You)'} {/*let user know where they stand*/}
                     </Text>
                     <View style={styles.statsRow}>
                         <IconSymbol name="star.fill" size={12} color="#facc15" />
@@ -111,7 +86,7 @@ export default function LeaderboardScreen() {
                         <Text style={styles.statsText}>{item.challengesCompleted} Challenges</Text>
                     </View>
                 </View>
-            </TouchableOpacity>
+            </View>
         );
     };
 

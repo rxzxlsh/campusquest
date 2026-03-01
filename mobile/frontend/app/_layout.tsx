@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { Stack, usePathname, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -57,28 +57,18 @@ export default function RootLayout() {
     const walletIsValidForUser =
       Boolean(walletAddress) && Boolean(userId) && walletOwnerUserId === userId;
 
-    const path = (pathname ?? "").toLowerCase();
-    const isOnUserProfile = path.includes("/user/") || path === "/user";
-    const isOnModal = path.startsWith("/modal");
-
     if (walletIsValidForUser) {
-      if (!isOnUserProfile && !isOnModal && path !== "/(tabs)" && !path.startsWith("/(tabs)"))
-        router.replace("/(tabs)");
+      if (segments[0] !== "(tabs)") router.replace("/(tabs)");
     } else {
-      if (!isOnUserProfile && !isOnModal && path !== "/wallet")
-        router.replace("/wallet");
+      if (segments[0] !== "wallet") router.replace("/wallet");
     }
 
     setIsReady(true);
-  }, [pathname, segments, router]);
+  }, [segments, router]);
 
-  // Run auth/redirect only once on mount so we don't redirect when user navigates to profile/modal
-  const didRun = useRef(false);
   useEffect(() => {
-    if (didRun.current) return;
-    didRun.current = true;
     void loadRouteState();
-  }, []);
+  }, [pathname, loadRouteState]);
 
   if (!isReady) return null;
 
