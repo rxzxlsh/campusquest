@@ -99,6 +99,21 @@ const UTM_NODES: CampusNode[] = [
     challengeId: "FIT_001",
     status: "online",
   },
+  {
+  id: 5,
+  name: "Davis Building",
+  latitude: 43.55055,
+  longitude: -79.66225,
+  emoji: "🧠",
+  club: "Computer Science Student Community",
+  tag: "Technology",
+  description: "Rapid-fire quiz node. One question. One shot. Earn instant rewards.",
+  challenge: "Innovation Micro-Quest: answer the 1-question cipher quiz to claim the reward.",
+  xp: 60,
+  coins: 120,
+  challengeId: "CODING_002",
+  status: "online",
+},
 ];
 
 const MAP_STYLE = [

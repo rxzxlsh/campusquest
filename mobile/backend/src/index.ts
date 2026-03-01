@@ -33,11 +33,12 @@ connectDB();
 type Challenge = {
   id: string;
   club: string;
-  type: string;
+  type: string; // "puzzle" | "quiz" | "photo" | etc
   description: string;
   xp: number;
   rewardLamports: number;
-  solution?: string; // ✅ only for answer-checked challenges
+  options?: string[]; // ✅ quiz choices
+  solution?: string; // ✅ for answer-checked challenges (puzzle/quiz)
 };
 
 type ProgressState = "started" | "completed";
@@ -88,6 +89,8 @@ const challenges: { [key: string]: Challenge } = {
     xp: 50,
     rewardLamports: defaultRewardLamports,
   },
+
+  // ✅ Text puzzle
   CODING_001: {
     id: "CODING_001",
     club: "Computer Science Student Community",
@@ -98,6 +101,19 @@ const challenges: { [key: string]: Challenge } = {
     rewardLamports: defaultRewardLamports,
     solution: "BCD",
   },
+
+  // ✅ NEW: 1-question multiple choice quiz
+  CODING_002: {
+    id: "CODING_002",
+    club: "Computer Science Student Community",
+    type: "quiz",
+    description: "Which option matches the cipher result for 'ABC' (A=B, B=C, C=D...)?",
+    options: ["ABC", "BCD", "CDE", "DEF"],
+    xp: 60,
+    rewardLamports: defaultRewardLamports,
+    solution: "BCD",
+  },
+
   PHOTO_001: {
     id: "PHOTO_001",
     club: "Hart House Camera Club",
@@ -106,6 +122,7 @@ const challenges: { [key: string]: Challenge } = {
     xp: 40,
     rewardLamports: defaultRewardLamports,
   },
+
   FIT_001: {
     id: "FIT_001",
     club: "Fitness for Noobs",
@@ -380,15 +397,25 @@ app.post("/challenges/:id/start", (req, res) => {
   if (!userProgress[userId]) userProgress[userId] = {};
   userProgress[userId][challengeId] = "started";
 
-  return res.json({ success: true, message: "Challenge started", userId, challengeId });
+  return res.json({
+    success: true,
+    message: "Challenge started",
+    userId,
+    challengeId,
+  });
 });
 
 // Submit an answer
-// ✅ Tiny change included: if correct, automatically triggers the same payout logic as /complete
+// ✅ quiz works automatically because it has options + solution
+// ✅ non-solution challenges auto-pass and auto-reward
 app.post("/challenges/:id/submit", async (req, res) => {
   const challengeId = req.params.id.toUpperCase();
   const challenge = challenges[challengeId];
-  const body = req.body as { userId?: string; answer?: string; walletAddress?: string };
+  const body = req.body as {
+    userId?: string;
+    answer?: string;
+    walletAddress?: string;
+  };
 
   if (!challenge) return res.status(404).json({ error: "Challenge not found" });
 
@@ -398,13 +425,10 @@ app.post("/challenges/:id/submit", async (req, res) => {
     return res.status(400).json({ error: "Challenge not started yet" });
   }
 
-  // ✅ Determine if this submission should count as "passed"
-  // - If challenge has no solution (review-type), auto-pass
-  // - If challenge has a solution (puzzle), require correct answer
+  // Determine pass/fail
   let passed = false;
-
   if (!challenge.solution) {
-    passed = true; // ✅ auto-award for non-solution challenges
+    passed = true; // auto-pass for non-solution missions
   } else {
     const answer = (body.answer ?? "").trim();
     passed = answer.toLowerCase() === challenge.solution.trim().toLowerCase();
@@ -419,10 +443,7 @@ app.post("/challenges/:id/submit", async (req, res) => {
     });
   }
 
-  // Mark as completed in game state
-  userProgress[userId][challengeId] = "completed";
-
-  // ---- Auto reward payout (same logic as /complete) ----
+  // Auto reward payout (same logic as /complete)
   const existingProfile = await getRewardProfile(userId);
   const fallbackDemoWallet = userId === demoUserId ? demoUserWallet.trim() : "";
   const walletAddress = (
@@ -433,16 +454,17 @@ app.post("/challenges/:id/submit", async (req, res) => {
 
   if (!walletAddress) {
     return res.status(400).json({
-      error: "No wallet found. Provide walletAddress or link wallet using /wallets/users/link.",
+      error:
+        "No wallet found. Provide walletAddress or link wallet using /wallets/users/link.",
     });
   }
   if (!isValidWalletAddress(walletAddress)) {
     return res.status(400).json({ error: "Invalid wallet address" });
   }
 
-  // ✅ Keep one reward per user per challenge
+  // One reward per user per challenge (but replay returns success)
   if (existingProfile?.completedChallengeIds?.includes(challengeId)) {
-    // Hackathon-friendly: treat replay as success but no payout
+    userProgress[userId][challengeId] = "completed";
     return res.json({
       success: true,
       message: "Completed! Reward already claimed for this user.",
@@ -455,7 +477,10 @@ app.post("/challenges/:id/submit", async (req, res) => {
   }
 
   try {
-    const rewardLamports = await resolvePayoutLamports(walletAddress, challenge.rewardLamports);
+    const rewardLamports = await resolvePayoutLamports(
+      walletAddress,
+      challenge.rewardLamports
+    );
     const rewardTxSignature = await sendLamports(walletAddress, rewardLamports);
 
     const completion: CompletionRecord = {
@@ -468,6 +493,8 @@ app.post("/challenges/:id/submit", async (req, res) => {
     };
 
     const profile = await recordCompletion(userId, walletAddress, challengeId, completion);
+
+    userProgress[userId][challengeId] = "completed";
 
     return res.json({
       success: true,
@@ -548,7 +575,8 @@ app.post("/challenges/:id/complete", async (req, res) => {
 
   if (!walletAddress) {
     return res.status(400).json({
-      error: "No wallet found. Provide walletAddress or link wallet using /wallets/users/link.",
+      error:
+        "No wallet found. Provide walletAddress or link wallet using /wallets/users/link.",
     });
   }
   if (!isValidWalletAddress(walletAddress)) {

@@ -19,6 +19,7 @@ type Challenge = {
   description: string;
   xp: number;
   rewardLamports: number;
+  options?: string[]; // ✅ quiz choices
 };
 
 type StartPayload = { success?: boolean; message?: string; error?: string };
@@ -33,6 +34,7 @@ type SubmitPayload =
       rewardLamports?: number;
       rewardTxSignature?: string;
       error?: string;
+      alreadyClaimed?: boolean;
     }
   | { success: false; message?: string; error?: string };
 
@@ -61,14 +63,16 @@ export default function PlayScreen() {
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(true);
+
   const [answer, setAnswer] = useState("");
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
 
-  const isPuzzle = useMemo(
-    () => challenge?.type?.toLowerCase() === "puzzle",
-    [challenge?.type]
-  );
+  const isQuiz = useMemo(() => challenge?.type?.toLowerCase() === "quiz", [challenge?.type]);
+  const isPuzzle = useMemo(() => challenge?.type?.toLowerCase() === "puzzle", [challenge?.type]);
 
+  // Fetch challenge + start it
   useEffect(() => {
     if (!challengeId) return;
 
@@ -87,6 +91,7 @@ export default function PlayScreen() {
         setLoading(false);
       }
 
+      // Start challenge
       setStarting(true);
       try {
         const s = await fetch(`${API_BASE_URL}/challenges/${challengeId}/start`, {
@@ -111,6 +116,11 @@ export default function PlayScreen() {
   const submit = async () => {
     if (!challenge) return;
 
+    if (isQuiz && !selectedOption) {
+      Alert.alert("Pick an option", "Select one answer first.");
+      return;
+    }
+
     if (isPuzzle && !answer.trim()) {
       Alert.alert("Missing Answer", "Enter an answer first.");
       return;
@@ -124,13 +134,14 @@ export default function PlayScreen() {
         body: JSON.stringify({
           userId,
           walletAddress,
-          answer: answer.trim(),
+          answer: isQuiz ? selectedOption : answer.trim(),
         }),
       });
 
       const payload = (await r.json()) as SubmitPayload;
       if (!r.ok) throw new Error((payload as any)?.error ?? "Submit failed");
 
+      // Incorrect
       if ("success" in payload && payload.success === false) {
         router.replace({
           pathname: "/(tabs)/challenge",
@@ -139,8 +150,10 @@ export default function PlayScreen() {
         return;
       }
 
+      // Success
       const p = payload as Extract<SubmitPayload, { success: true }>;
 
+      // If reward signature exists, show "win" flow
       if (p.rewardTxSignature) {
         router.replace({
           pathname: "/(tabs)/challenge",
@@ -151,12 +164,28 @@ export default function PlayScreen() {
             rewardTxSignature: p.rewardTxSignature,
           },
         });
-      } else {
+        return;
+      }
+
+      // If already claimed, still treat as win-ish (your lobby will alert “Submitted” otherwise)
+      if (p.alreadyClaimed) {
         router.replace({
           pathname: "/(tabs)/challenge",
-          params: { challengeId: challenge.id, result: "submitted" },
+          params: {
+            challengeId: challenge.id,
+            result: "win",
+            rewardLamports: String(p.rewardLamports ?? ""),
+            rewardTxSignature: "",
+          },
         });
+        return;
       }
+
+      // Fallback
+      router.replace({
+        pathname: "/(tabs)/challenge",
+        params: { challengeId: challenge.id, result: "submitted" },
+      });
     } catch {
       router.replace({
         pathname: "/(tabs)/challenge",
@@ -166,6 +195,19 @@ export default function PlayScreen() {
       setSubmitting(false);
     }
   };
+
+  if (loading || starting) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" />
+        <Text style={styles.loadingText}>
+          {loading ? "Loading mission…" : "Booting challenge…"}
+        </Text>
+      </View>
+    );
+  }
+
+  if (!challenge) return null;
 
   return (
     <View style={styles.screen}>
@@ -188,90 +230,99 @@ export default function PlayScreen() {
         ))}
       </View>
 
-      {loading || starting ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" />
-          <Text style={styles.loadingText}>
-            {loading ? "Loading mission…" : "Booting challenge…"}
-          </Text>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Play</Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{prettyType(challenge.type)}</Text>
+          </View>
         </View>
-      ) : !challenge ? null : (
-        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-          <View style={styles.headerRow}>
-            <Text style={styles.title}>Play</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{prettyType(challenge.type)}</Text>
-            </View>
+
+        <Text style={styles.subtitle}>{challenge.club}</Text>
+
+        <View style={styles.metaRow}>
+          <View style={styles.metaPill}>
+            <Text style={styles.metaPillLabel}>XP</Text>
+            <Text style={styles.metaPillValue}>+{challenge.xp}</Text>
           </View>
-
-          <Text style={styles.subtitle}>{challenge.club}</Text>
-
-          <View style={styles.metaRow}>
-            <View style={styles.metaPill}>
-              <Text style={styles.metaPillLabel}>XP</Text>
-              <Text style={styles.metaPillValue}>+{challenge.xp}</Text>
-            </View>
-            <View style={styles.metaPill}>
-              <Text style={styles.metaPillLabel}>Reward</Text>
-              <Text style={styles.metaPillValue}>{challenge.rewardLamports} lamports</Text>
-            </View>
+          <View style={styles.metaPill}>
+            <Text style={styles.metaPillLabel}>Reward</Text>
+            <Text style={styles.metaPillValue}>{challenge.rewardLamports} lamports</Text>
           </View>
+        </View>
 
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>Prompt</Text>
+          <Text style={styles.prompt}>{challenge.description}</Text>
+        </View>
+
+        <View style={styles.identityCard}>
+          <View style={styles.identityIcon}>
+            <Text style={styles.identityIconText}>👤</Text>
+          </View>
+          <View style={styles.identityTextWrap}>
+            <Text style={styles.identityTitle}>{userId}</Text>
+            <Text style={styles.identityMeta}>Wallet: {shortWallet(walletAddress)}</Text>
+          </View>
+        </View>
+
+        {/* ✅ QUIZ UI */}
+        {isQuiz ? (
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>Prompt</Text>
-            <Text style={styles.prompt}>{challenge.description}</Text>
+            <Text style={styles.cardLabel}>Choose One</Text>
+            <View style={{ gap: 10 }}>
+              {(challenge.options ?? []).map((opt) => {
+                const active = selectedOption === opt;
+                return (
+                  <Pressable
+                    key={opt}
+                    onPress={() => setSelectedOption(opt)}
+                    style={[styles.optionButton, active ? styles.optionButtonActive : null]}
+                    disabled={submitting}
+                  >
+                    <Text style={[styles.optionText, active ? styles.optionTextActive : null]}>
+                      {opt}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-
-          <View style={styles.identityCard}>
-            <View style={styles.identityIcon}>
-              <Text style={styles.identityIconText}>👤</Text>
-            </View>
-            <View style={styles.identityTextWrap}>
-              <Text style={styles.identityTitle}>{userId}</Text>
-              <Text style={styles.identityMeta}>Wallet: {shortWallet(walletAddress)}</Text>
-            </View>
+        ) : isPuzzle ? (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Your Answer</Text>
+            <TextInput
+              value={answer}
+              onChangeText={setAnswer}
+              style={styles.input}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Type your answer…"
+              placeholderTextColor="rgba(208, 233, 255, 0.55)"
+            />
+            <Text style={styles.helper}>Tip: answers are case-insensitive.</Text>
           </View>
-
-          {isPuzzle ? (
-            <View style={styles.card}>
-              <Text style={styles.cardLabel}>Your Answer</Text>
-              <TextInput
-                value={answer}
-                onChangeText={setAnswer}
-                style={styles.input}
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholder="Type your answer…"
-                placeholderTextColor="rgba(208, 233, 255, 0.55)"
-              />
-              <Text style={styles.helper}>
-                Tip: answers are case-insensitive.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.card}>
-              <Text style={styles.cardLabel}>No Text Answer Required</Text>
-              <Text style={styles.helper}>
-                This mission is auto-scored. Tap submit to claim the reward.
-              </Text>
-            </View>
-          )}
-
-          <Pressable
-            style={[styles.primaryButton, submitting ? styles.primaryButtonDisabled : null]}
-            onPress={submit}
-            disabled={submitting}
-          >
-            <Text style={styles.primaryButtonText}>
-              {submitting ? "Submitting…" : "Submit"}
+        ) : (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>No Text Answer Required</Text>
+            <Text style={styles.helper}>
+              This mission is auto-scored. Tap submit to claim the reward.
             </Text>
-          </Pressable>
+          </View>
+        )}
 
-          <Pressable style={styles.ghostButton} onPress={() => router.back()} disabled={submitting}>
-            <Text style={styles.ghostButtonText}>Back</Text>
-          </Pressable>
-        </ScrollView>
-      )}
+        <Pressable
+          style={[styles.primaryButton, submitting ? styles.primaryButtonDisabled : null]}
+          onPress={submit}
+          disabled={submitting}
+        >
+          <Text style={styles.primaryButtonText}>{submitting ? "Submitting…" : "Submit"}</Text>
+        </Pressable>
+
+        <Pressable style={styles.ghostButton} onPress={() => router.back()} disabled={submitting}>
+          <Text style={styles.ghostButtonText}>Back</Text>
+        </Pressable>
+      </ScrollView>
     </View>
   );
 }
@@ -446,6 +497,26 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "600",
     fontSize: 12,
+  },
+
+  optionButton: {
+    borderWidth: 1,
+    borderColor: "#326dc2",
+    borderRadius: 12,
+    backgroundColor: "rgba(3, 15, 42, 0.95)",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  optionButtonActive: {
+    borderColor: "#9bd7ff",
+    backgroundColor: "rgba(12, 44, 93, 0.95)",
+  },
+  optionText: {
+    color: "#d9edff",
+    fontWeight: "800",
+  },
+  optionTextActive: {
+    color: "#f4faff",
   },
 
   primaryButton: {
