@@ -45,9 +45,12 @@ router.get('/leaderboard', async (req, res) => {
       .select('username xp completedChallenges')
       .lean();
 
-    const leaderboard = users.map(u => ({
+
+    const leaderboard = users
+    .filter(u => u.username && u.username.trim() !== '')
+    .map(u => ({
       id: u._id,
-      username: u.username || 'Anonymous CampusQuestor',
+      username: u.username,
       xp: u.xp || 0,
       challengesCompleted: u.completedChallenges?.length || 0,
     }));
