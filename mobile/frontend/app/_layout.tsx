@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
-import { Redirect, Stack, usePathname, useSegments } from "expo-router";
+import { Stack, usePathname, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -19,7 +19,8 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const pathname = usePathname();
   const segments = useSegments();
-  const [routeState, setRouteState] = useState<"loading" | "login" | "wallet" | "app">("loading");
+  const router = useRouter();
+  const [isReady, setIsReady] = useState(false);
 
   const loadRouteState = useCallback(async () => {
     const [token, user, walletAddress, walletOwnerUserId] = await Promise.all([
@@ -30,7 +31,8 @@ export default function RootLayout() {
     ]);
 
     if (!token) {
-      setRouteState("login");
+      if (segments[0] !== "login") router.replace("/login");
+      setIsReady(true);
       return;
     }
 
@@ -40,12 +42,14 @@ export default function RootLayout() {
       });
       if (!response.ok) {
         await clearAllSession();
-        setRouteState("login");
+        if (segments[0] !== "login") router.replace("/login");
+        setIsReady(true);
         return;
       }
     } catch {
       await clearAllSession();
-      setRouteState("login");
+      if (segments[0] !== "login") router.replace("/login");
+      setIsReady(true);
       return;
     }
 
@@ -53,18 +57,20 @@ export default function RootLayout() {
     const walletIsValidForUser =
       Boolean(walletAddress) && Boolean(userId) && walletOwnerUserId === userId;
 
-    setRouteState(walletIsValidForUser ? "app" : "wallet");
-  }, []);
+    if (walletIsValidForUser) {
+      if (segments[0] !== "(tabs)") router.replace("/(tabs)");
+    } else {
+      if (segments[0] !== "wallet") router.replace("/wallet");
+    }
+
+    setIsReady(true);
+  }, [segments, router]);
 
   useEffect(() => {
     void loadRouteState();
   }, [pathname, loadRouteState]);
 
-  if (routeState === "loading") return null;
-  const activeRoot = segments[0] ?? "";
-  const inTabs = activeRoot === "(tabs)";
-  const inLogin = activeRoot === "login";
-  const inWallet = activeRoot === "wallet";
+  if (!isReady) return null;
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
@@ -74,9 +80,6 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />
       </Stack>
-      {routeState === "login" && !inLogin ? <Redirect href="/login" /> : null}
-      {routeState === "wallet" && !inWallet ? <Redirect href="/wallet" /> : null}
-      {routeState === "app" && !inTabs ? <Redirect href="/(tabs)" /> : null}
       <StatusBar style="auto" />
     </ThemeProvider>
   );

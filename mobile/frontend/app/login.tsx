@@ -34,7 +34,7 @@ export default function LoginScreen() {
       return;
     }
 
-    router.replace("/(tabs)/profile");
+    router.replace("/(tabs)");
   };
 
   const handleSubmit = async () => {
