@@ -25,6 +25,11 @@ app.use(express.json());
 
 connectDB();
 
+/**
+ * -------------------------
+ * Game Logic Types + Store
+ * -------------------------
+ */
 type Challenge = {
   id: string;
   club: string;
@@ -32,8 +37,17 @@ type Challenge = {
   description: string;
   xp: number;
   rewardLamports: number;
+  solution?: string; // ✅ only for answer-checked challenges
 };
 
+type ProgressState = "started" | "completed";
+const userProgress: Record<string, Record<string, ProgressState>> = {};
+
+/**
+ * -------------------------
+ * Rewards / Profile Types
+ * -------------------------
+ */
 type CompletionRecord = {
   challengeId: string;
   challengeClub: string;
@@ -58,12 +72,19 @@ const demoUserId = process.env.DEMO_USER_ID ?? "demo-user-001";
 const demoUserWallet = process.env.DEMO_USER_WALLET ?? "";
 const memoryProfiles = new Map<string, RewardProfileSnapshot>();
 
+/**
+ * -------------------------
+ * Challenge Store
+ * (questions + solutions)
+ * -------------------------
+ */
 const challenges: { [key: string]: Challenge } = {
   GREEN_001: {
     id: "GREEN_001",
     club: "Green Leading Club UofT",
     type: "sustainability",
-    description: "Carpool Challenge - Find a carpool buddy on campus and reduce your carbon footprint!",
+    description:
+      "Carpool Challenge - Find a carpool buddy on campus and reduce your carbon footprint!",
     xp: 50,
     rewardLamports: defaultRewardLamports,
   },
@@ -71,9 +92,11 @@ const challenges: { [key: string]: Challenge } = {
     id: "CODING_001",
     club: "Computer Science Student Community",
     type: "puzzle",
-    description: "Decrypt this cipher hidden in the QR",
+    description:
+      "Decrypt this simple cipher: A=B, B=C, C=D... What does 'ABC' become?",
     xp: 75,
     rewardLamports: defaultRewardLamports,
+    solution: "BCD",
   },
   PHOTO_001: {
     id: "PHOTO_001",
@@ -86,10 +109,11 @@ const challenges: { [key: string]: Challenge } = {
   FIT_001: {
     id: "FIT_001",
     club: "Fitness for Noobs",
-    type: "fitness",
-    description: "Design a faster walking path between X and Y",
+    type: "puzzle",
+    description: "Type the word 'Symmetry' as a test puzzle",
     xp: 60,
     rewardLamports: defaultRewardLamports,
+    solution: "Symmetry",
   },
 };
 
@@ -124,7 +148,9 @@ function explorerClusterFromRpcUrl(url: string) {
 }
 
 function txExplorerUrl(signature: string) {
-  return `https://explorer.solana.com/tx/${signature}?cluster=${explorerClusterFromRpcUrl(rpcUrl)}`;
+  return `https://explorer.solana.com/tx/${signature}?cluster=${explorerClusterFromRpcUrl(
+    rpcUrl
+  )}`;
 }
 
 function toSol(lamports: number) {
@@ -146,7 +172,9 @@ function normalizeProfile(profile: RewardProfileSnapshot | null) {
   };
 }
 
-async function getRewardProfile(userId: string): Promise<RewardProfileSnapshot | null> {
+async function getRewardProfile(
+  userId: string
+): Promise<RewardProfileSnapshot | null> {
   if (isMongoReady()) {
     const profile = await RewardProfile.findOne({ userId }).lean();
     if (!profile) return null;
@@ -168,7 +196,10 @@ async function getRewardProfile(userId: string): Promise<RewardProfileSnapshot |
   return memoryProfiles.get(userId) ?? null;
 }
 
-async function upsertWalletProfile(userId: string, walletAddress: string): Promise<RewardProfileSnapshot> {
+async function upsertWalletProfile(
+  userId: string,
+  walletAddress: string
+): Promise<RewardProfileSnapshot> {
   if (isMongoReady()) {
     const profile = await RewardProfile.findOneAndUpdate(
       { userId },
@@ -287,11 +318,18 @@ async function sendLamports(toWallet: string, lamports: number) {
   });
 }
 
-async function resolvePayoutLamports(walletAddress: string, configuredLamports: number) {
-  const accountInfo = await connection.getAccountInfo(new PublicKey(walletAddress), "confirmed");
+async function resolvePayoutLamports(
+  walletAddress: string,
+  configuredLamports: number
+) {
+  const accountInfo = await connection.getAccountInfo(
+    new PublicKey(walletAddress),
+    "confirmed"
+  );
   if (accountInfo) return configuredLamports;
 
-  const minimumForNewSystemAccount = await connection.getMinimumBalanceForRentExemption(0);
+  const minimumForNewSystemAccount =
+    await connection.getMinimumBalanceForRentExemption(0);
   return Math.max(configuredLamports, minimumForNewSystemAccount);
 }
 
@@ -312,17 +350,155 @@ app.get("/health", (_req, res) => {
   });
 });
 
+/**
+ * -------------------------
+ * Game Logic Routes
+ * -------------------------
+ */
+
+// GET challenge by ID (do not leak solution)
 app.get("/challenges/:id", (req, res) => {
   const { id } = req.params;
   const normalizedId = id.toUpperCase();
   const challenge = challenges[normalizedId];
 
   if (!challenge) return res.status(404).json({ error: "Challenge not found" });
-  return res.json(challenge);
+
+  const { solution, ...safeChallenge } = challenge;
+  return res.json(safeChallenge);
 });
 
+// Start a challenge (marks progress)
+app.post("/challenges/:id/start", (req, res) => {
+  const challengeId = req.params.id.toUpperCase();
+  const challenge = challenges[challengeId];
+  const body = req.body as { userId?: string };
+
+  if (!challenge) return res.status(404).json({ error: "Challenge not found" });
+
+  const userId = (body.userId?.trim() || demoUserId).trim();
+  if (!userProgress[userId]) userProgress[userId] = {};
+  userProgress[userId][challengeId] = "started";
+
+  return res.json({ success: true, message: "Challenge started", userId, challengeId });
+});
+
+// Submit an answer
+// ✅ Tiny change included: if correct, automatically triggers the same payout logic as /complete
+app.post("/challenges/:id/submit", async (req, res) => {
+  const challengeId = req.params.id.toUpperCase();
+  const challenge = challenges[challengeId];
+  const body = req.body as { userId?: string; answer?: string; walletAddress?: string };
+
+  if (!challenge) return res.status(404).json({ error: "Challenge not found" });
+
+  const userId = (body.userId?.trim() || demoUserId).trim();
+
+  if (userProgress[userId]?.[challengeId] !== "started") {
+    return res.status(400).json({ error: "Challenge not started yet" });
+  }
+
+  // ✅ Determine if this submission should count as "passed"
+  // - If challenge has no solution (review-type), auto-pass
+  // - If challenge has a solution (puzzle), require correct answer
+  let passed = false;
+
+  if (!challenge.solution) {
+    passed = true; // ✅ auto-award for non-solution challenges
+  } else {
+    const answer = (body.answer ?? "").trim();
+    passed = answer.toLowerCase() === challenge.solution.trim().toLowerCase();
+  }
+
+  if (!passed) {
+    return res.json({
+      success: false,
+      message: "Incorrect, try again.",
+      userId,
+      challengeId,
+    });
+  }
+
+  // Mark as completed in game state
+  userProgress[userId][challengeId] = "completed";
+
+  // ---- Auto reward payout (same logic as /complete) ----
+  const existingProfile = await getRewardProfile(userId);
+  const fallbackDemoWallet = userId === demoUserId ? demoUserWallet.trim() : "";
+  const walletAddress = (
+    body.walletAddress?.trim() ||
+    existingProfile?.walletAddress ||
+    fallbackDemoWallet
+  ).trim();
+
+  if (!walletAddress) {
+    return res.status(400).json({
+      error: "No wallet found. Provide walletAddress or link wallet using /wallets/users/link.",
+    });
+  }
+  if (!isValidWalletAddress(walletAddress)) {
+    return res.status(400).json({ error: "Invalid wallet address" });
+  }
+
+  // ✅ Keep one reward per user per challenge
+  if (existingProfile?.completedChallengeIds?.includes(challengeId)) {
+    // Hackathon-friendly: treat replay as success but no payout
+    return res.json({
+      success: true,
+      message: "Completed! Reward already claimed for this user.",
+      challengeId,
+      userId,
+      walletAddress,
+      xp: challenge.xp,
+      alreadyClaimed: true,
+    });
+  }
+
+  try {
+    const rewardLamports = await resolvePayoutLamports(walletAddress, challenge.rewardLamports);
+    const rewardTxSignature = await sendLamports(walletAddress, rewardLamports);
+
+    const completion: CompletionRecord = {
+      challengeId,
+      challengeClub: challenge.club,
+      rewardLamports,
+      rewardTxSignature,
+      rewardTxUrl: txExplorerUrl(rewardTxSignature),
+      completedAt: new Date().toISOString(),
+    };
+
+    const profile = await recordCompletion(userId, walletAddress, challengeId, completion);
+
+    return res.json({
+      success: true,
+      message: "Completed! Reward sent.",
+      challengeId,
+      userId,
+      walletAddress,
+      xp: challenge.xp,
+      rewardLamports,
+      rewardSol: toSol(rewardLamports),
+      rewardTxSignature,
+      rewardTxUrl: txExplorerUrl(rewardTxSignature),
+      totalRewardLamports: profile.totalRewardLamports,
+      totalRewardSol: toSol(profile.totalRewardLamports),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Reward transfer failed";
+    return res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * -------------------------
+ * Existing Wallet/Profile Routes
+ * -------------------------
+ */
 app.post("/wallets/users/link", async (req, res) => {
-  const { userId, walletAddress } = req.body as { userId?: string; walletAddress?: string };
+  const { userId, walletAddress } = req.body as {
+    userId?: string;
+    walletAddress?: string;
+  };
 
   if (!userId || !walletAddress) {
     return res.status(400).json({ error: "userId and walletAddress are required" });
@@ -345,12 +521,15 @@ app.get("/users/:userId/profile", async (req, res) => {
   const profile = await getRewardProfile(userId);
 
   if (!profile) {
-    return res.status(404).json({ error: "User profile not found. Complete a challenge first." });
+    return res
+      .status(404)
+      .json({ error: "User profile not found. Complete a challenge first." });
   }
 
   return res.json(normalizeProfile(profile));
 });
 
+// Keep your original complete endpoint (still usable if client calls it directly)
 app.post("/challenges/:id/complete", async (req, res) => {
   const challengeId = req.params.id.toUpperCase();
   const challenge = challenges[challengeId];
@@ -361,7 +540,11 @@ app.post("/challenges/:id/complete", async (req, res) => {
   const userId = (body.userId?.trim() || demoUserId).trim();
   const existingProfile = await getRewardProfile(userId);
   const fallbackDemoWallet = userId === demoUserId ? demoUserWallet.trim() : "";
-  const walletAddress = (body.walletAddress?.trim() || existingProfile?.walletAddress || fallbackDemoWallet).trim();
+  const walletAddress = (
+    body.walletAddress?.trim() ||
+    existingProfile?.walletAddress ||
+    fallbackDemoWallet
+  ).trim();
 
   if (!walletAddress) {
     return res.status(400).json({
@@ -379,6 +562,7 @@ app.post("/challenges/:id/complete", async (req, res) => {
   try {
     const rewardLamports = await resolvePayoutLamports(walletAddress, challenge.rewardLamports);
     const rewardTxSignature = await sendLamports(walletAddress, rewardLamports);
+
     const completion: CompletionRecord = {
       challengeId,
       challengeClub: challenge.club,

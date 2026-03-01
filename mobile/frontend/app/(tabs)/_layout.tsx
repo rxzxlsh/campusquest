@@ -57,6 +57,13 @@ export default function TabLayout() {
           href: null,
         }}
       />
+
+        <Tabs.Screen
+        name="play"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
