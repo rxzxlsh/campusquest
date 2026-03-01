@@ -34,14 +34,16 @@ type CampusNode = {
 const UTM_NODES: CampusNode[] = [
   {
     id: 1,
-    name: "Robarts Library",
-    latitude: 43.6648,
-    longitude: -79.3994,
+    name: "Maanjiwe Nendamowinan",
+    latitude: 43.55111,
+    longitude: -79.66583,
     emoji: "🌱",
     club: "Green Leading Club UofT",
     tag: "Sustainability",
-    description: "Spot and report hidden campus inefficiencies to unlock Green Ops rewards.",
-    challenge: "Innovation Micro-Quest: document 3 practical waste-reduction opportunities.",
+    description:
+      "Carpool Challenge — find a carpool buddy on campus and reduce your carbon footprint.",
+    challenge:
+      "Find a carpool buddy today. (No text answer — submit/verify via QR check-in or manual review.)",
     xp: 50,
     coins: 100,
     challengeId: "GREEN_001",
@@ -50,14 +52,15 @@ const UTM_NODES: CampusNode[] = [
   },
   {
     id: 2,
-    name: "Bahen Centre",
-    latitude: 43.6597,
-    longitude: -79.3978,
+    name: "Instructional Centre",
+    latitude: 43.5516,
+    longitude: -79.664,
     emoji: "💻",
     club: "Computer Science Student Community",
     tag: "Technology",
-    description: "Cipher and optimization missions that test fast, creative technical thinking.",
-    challenge: "Innovation Micro-Quest: decrypt the node cipher and optimize the broken snippet.",
+    description: "Cipher mission — quick decryption under pressure.",
+    challenge:
+      "Decrypt this simple cipher: A=B, B=C, C=D... What does 'ABC' become?",
     xp: 75,
     coins: 150,
     challengeId: "CODING_001",
@@ -66,14 +69,15 @@ const UTM_NODES: CampusNode[] = [
   },
   {
     id: 3,
-    name: "Hart House",
-    latitude: 43.6629,
-    longitude: -79.3957,
-    emoji: "📸",
+    name: "CCIT Building",
+    latitude: 43.5484,
+    longitude: -79.6632,
+    emoji: "🎬",
     club: "Hart House Camera Club",
     tag: "Creativity",
-    description: "Story-driven visual missions built around observation and composition.",
-    challenge: "Innovation Micro-Quest: capture one image that explains 'campus momentum'.",
+    description: "Photo mission — capture symmetry on campus.",
+    challenge:
+      "Capture symmetry on campus. (No text answer — submit photo / pending review.)",
     xp: 40,
     coins: 80,
     challengeId: "PHOTO_001",
@@ -82,19 +86,34 @@ const UTM_NODES: CampusNode[] = [
   },
   {
     id: 4,
-    name: "Athletic Centre",
-    latitude: 43.6624,
-    longitude: -79.3995,
+    name: "RAWC",
+    latitude: 43.5479,
+    longitude: -79.6609,
     emoji: "🏃",
     club: "Fitness for Noobs",
     tag: "Wellness",
-    description: "Build route intelligence and collaborative performance strategies.",
-    challenge: "Innovation Micro-Quest: design a faster campus route and explain your logic.",
+    description: "Test puzzle mission — quick validation check.",
+    challenge: "Type the word 'Symmetry' as a test puzzle.",
     xp: 60,
     coins: 120,
     challengeId: "FIT_001",
     status: "online",
   },
+  {
+  id: 5,
+  name: "Davis Building",
+  latitude: 43.55055,
+  longitude: -79.66225,
+  emoji: "🧠",
+  club: "Computer Science Student Community",
+  tag: "Technology",
+  description: "Rapid-fire quiz node. One question. One shot. Earn instant rewards.",
+  challenge: "Innovation Micro-Quest: answer the 1-question cipher quiz to claim the reward.",
+  xp: 60,
+  coins: 120,
+  challengeId: "CODING_002",
+  status: "online",
+},
 ];
 
 const MAP_STYLE = [
@@ -120,10 +139,10 @@ const STATUS_COLORS: Record<NodeStatus, string> = {
 };
 
 const INITIAL_REGION: Region = {
-  latitude: 43.6629,
-  longitude: -79.3957,
-  latitudeDelta: 0.012,
-  longitudeDelta: 0.012,
+  latitude: 43.5483,
+  longitude: -79.6627,
+  latitudeDelta: 0.01,
+  longitudeDelta: 0.01,
 };
 
 export default function MapsScreen() {
