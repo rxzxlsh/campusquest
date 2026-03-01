@@ -13,6 +13,7 @@ import {
 } from "@solana/web3.js";
 import { connectDB } from "./db";
 import userRoutes from "./routes/users";
+import authRoutes from "./routes/auth";
 import RewardProfile from "./models/RewardProfile";
 
 dotenv.config({ override: true });
@@ -621,6 +622,7 @@ app.post("/challenges/:id/complete", async (req, res) => {
 });
 
 app.use("/api/users", userRoutes);
+app.use("/api/auth", authRoutes);
 
 app.listen(port, "0.0.0.0", () => {
   console.log(`Backend running at http://0.0.0.0:${port}`);
